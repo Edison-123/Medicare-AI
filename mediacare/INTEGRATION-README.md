@@ -22,7 +22,8 @@ Backend:
 
 ```powershell
 cd mediacare-backend
-$env:MEDICARE_JWT_SECRET = "your-local-secret-at-least-32-characters"
+# Configure your existing local, untracked .env with private database, JWT, and seed-user values.
+# MEDICARE_JWT_SECRET must be Base64 and decode to at least 32 bytes.
 mvn clean spring-boot:run
 ```
 
@@ -44,7 +45,8 @@ The included backend uses MySQL:
 - Port: `3306`
 - Database: `medicare_db`
 - Username: `root`
-- Password: `000`
+- Set `MYSQL_PASSWORD` and `SEED_USER_PASSWORD` in your existing local `.env` file; Git ignores this file.
+- `SEED_USER_PASSWORD` is required to seed local accounts on first startup.
 
 ## Admin patient registration
 

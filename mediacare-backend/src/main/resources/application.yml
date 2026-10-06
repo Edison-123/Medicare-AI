@@ -1,0 +1,46 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: medicare-backend
+  profiles:
+    active: mysql
+
+  datasource:
+    # PRODUCTION NOTE: Enable useSSL=true and provide a trusted certificate store.
+    # PRODUCTION NOTE: Set MYSQL_PASSWORD as a secure environment variable; never hard-code credentials.
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/medicare_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD}
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      # PRODUCTION NOTE: Change to 'validate' and use Flyway/Liquibase for schema migrations.
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# JWT Configuration
+medicare:
+  jwt:
+    secret: ${MEDICARE_JWT_SECRET}
+    expiration-ms: ${MEDICARE_JWT_EXPIRATION_MS:86400000}
+  ai:
+    ollama-url: ${MEDICARE_OLLAMA_URL:http://localhost:11434}
+    model: ${MEDICARE_AI_MODEL:qwen2.5-coder:7b}
+
+# Swagger / OpenAPI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
