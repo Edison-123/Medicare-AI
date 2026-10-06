@@ -65,8 +65,27 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (userRepository.count() > 0)
+        if (userRepository.count() > 0) {
+            hospitalRepository.findAll().stream()
+                    .filter(hospital -> "HOSP-01".equals(hospital.getCode()))
+                    .findFirst()
+                    .ifPresent(hospital -> {
+                        if (hospital.getType() == null)
+                            hospital.setType("Tertiary Care Hospital");
+                        if (hospital.getAddress() == null)
+                            hospital.setAddress("100 Medical Parkway, Metropolis");
+                        if (hospital.getDirector() == null)
+                            hospital.setDirector("Dr. John Smith");
+                        if (hospital.getDepartmentsCount() == null)
+                            hospital.setDepartmentsCount(6);
+                        if (hospital.getDoctorsCount() == null)
+                            hospital.setDoctorsCount(2);
+                        if (hospital.getBedsTotal() == null)
+                            hospital.setBedsTotal(500);
+                        hospitalRepository.save(hospital);
+                    });
             return;
+        }
 
         // Seed password is read from the environment; never hard-code credentials.
         // Set SEED_USER_PASSWORD to a strong value before first run.
@@ -174,6 +193,12 @@ public class DataInitializer implements CommandLineRunner {
         h1.setName("MediCare Central Hospital");
         h1.setCode("HOSP-01");
         h1.setCity("Metropolis");
+        h1.setType("Tertiary Care Hospital");
+        h1.setAddress("100 Medical Parkway, Metropolis");
+        h1.setDirector("Dr. John Smith");
+        h1.setDepartmentsCount(6);
+        h1.setDoctorsCount(2);
+        h1.setBedsTotal(500);
         h1.setBedsOccupied(412);
         h1.setStatus("Active");
         h1.setApiStatus("Online (25ms)");

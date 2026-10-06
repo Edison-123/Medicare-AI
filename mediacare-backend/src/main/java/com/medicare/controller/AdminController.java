@@ -50,7 +50,8 @@ public class AdminController {
     @PutMapping("/doctors/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update doctor status (Active, Suspended, etc.)")
-    public ResponseEntity<Doctor> updateDoctorStatus(@PathVariable("id") Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<Doctor> updateDoctorStatus(@PathVariable("id") Long id,
+            @RequestBody Map<String, String> body) {
         String status = body.getOrDefault("status", "Active");
         return ResponseEntity.ok(adminService.updateDoctorStatus(id, status));
     }
@@ -73,7 +74,8 @@ public class AdminController {
     @PutMapping("/patients/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update patient status")
-    public ResponseEntity<Patient> updatePatientStatus(@PathVariable("id") Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<Patient> updatePatientStatus(@PathVariable("id") Long id,
+            @RequestBody Map<String, String> body) {
         String status = body.getOrDefault("status", "Active");
         return ResponseEntity.ok(adminService.updatePatientStatus(id, status));
     }
@@ -81,8 +83,10 @@ public class AdminController {
     @GetMapping("/hospitals")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get hospital network directory")
-    public ResponseEntity<List<Hospital>> getHospitals() {
-        return ResponseEntity.ok(adminService.getHospitals());
+    public ResponseEntity<List<Hospital>> getHospitals(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "All") String status) {
+        return ResponseEntity.ok(adminService.getHospitals(q, status));
     }
 
     @PostMapping("/hospitals")

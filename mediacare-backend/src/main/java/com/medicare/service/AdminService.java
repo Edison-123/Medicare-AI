@@ -225,8 +225,21 @@ public class AdminService {
         return patientRepository.save(patient);
     }
 
-    public List<Hospital> getHospitals() {
-        return hospitalRepository.findAll();
+    public List<Hospital> getHospitals(String query, String status) {
+        String normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        String normalizedStatus = status == null || status.isBlank() ? "All" : status.trim();
+        return hospitalRepository.findAll().stream()
+                .filter(hospital -> "All".equalsIgnoreCase(normalizedStatus)
+                        || normalizedStatus.equalsIgnoreCase(hospital.getStatus()))
+                .filter(hospital -> normalizedQuery.isEmpty()
+                        || containsIgnoreCase(hospital.getName(), normalizedQuery)
+                        || containsIgnoreCase(hospital.getCode(), normalizedQuery)
+                        || containsIgnoreCase(hospital.getCity(), normalizedQuery))
+                .toList();
+    }
+
+    private boolean containsIgnoreCase(String value, String query) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(query);
     }
 
     public Hospital addHospital(Hospital hospital) {

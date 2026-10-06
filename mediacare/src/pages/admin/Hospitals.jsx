@@ -104,7 +104,8 @@ export default function AdminHospitals() {
       {/* Hospital Cards Grid */}
       <div className="grid-2">
         {hospitals && hospitals.map(hosp => {
-          const occPct = Math.round((hosp.bedsOccupied / hosp.bedsTotal) * 100)
+          const hasCapacity = Number.isFinite(hosp.bedsOccupied) && Number.isFinite(hosp.bedsTotal) && hosp.bedsTotal > 0
+          const occPct = hasCapacity ? Math.round((hosp.bedsOccupied / hosp.bedsTotal) * 100) : null
           return (
             <Card key={hosp.id} style={{ padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
@@ -123,12 +124,12 @@ export default function AdminHospitals() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: 'var(--muted)', margin: '8px 0 12px' }}>
-                  <MapPin size={15} /> {hosp.address}
+                  <MapPin size={15} /> {hosp.address || hosp.city || 'Address not configured'}
                 </div>
 
                 {/* Director & Accreditation */}
                 <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, fontSize: '0.85rem', marginBottom: 14 }}>
-                  <div>Medical Director: <strong>{hosp.director}</strong></div>
+                  <div>Medical Director: <strong>{hosp.director || 'Not configured'}</strong></div>
                   <div style={{ color: 'var(--primary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <ShieldCheck size={14} /> {hosp.complianceCert}
                   </div>
@@ -138,15 +139,15 @@ export default function AdminHospitals() {
                 <div className="grid-3" style={{ textAlign: 'center', marginBottom: 14 }}>
                   <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
                     <div className="muted small">Doctors</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{hosp.doctorsCount}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{hosp.doctorsCount ?? '—'}</div>
                   </div>
                   <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
                     <div className="muted small">Depts</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{hosp.departmentsCount}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{hosp.departmentsCount ?? '—'}</div>
                   </div>
                   <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
                     <div className="muted small">Total Beds</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{hosp.bedsTotal}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{hosp.bedsTotal ?? '—'}</div>
                   </div>
                 </div>
 
@@ -154,14 +155,14 @@ export default function AdminHospitals() {
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--muted)', marginBottom: 4 }}>
                     <span>Bed Occupancy</span>
-                    <strong>{hosp.bedsOccupied} of {hosp.bedsTotal} beds ({occPct}%)</strong>
+                    <strong>{hosp.bedsOccupied ?? '—'} of {hosp.bedsTotal ?? '—'} beds ({occPct === null ? 'N/A' : `${occPct}%`})</strong>
                   </div>
                   <div className="progress-bar-wrap">
                     <div
                       className="progress-bar-fill"
                       style={{
-                        width: `${occPct}%`,
-                        background: occPct > 80 ? '#ef4444' : 'var(--primary)'
+                        width: `${Math.min(100, Math.max(0, occPct ?? 0))}%`,
+                        background: occPct !== null && occPct > 80 ? '#ef4444' : 'var(--primary)'
                       }}
                     />
                   </div>

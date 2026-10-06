@@ -2136,10 +2136,11 @@ export const adminApi = {
   } = {}) => {
 
     if (!USE_MOCK) {
+      const params = new URLSearchParams({ q, status })
 
       return http(
 
-        `/admin/hospitals?q=${q}&status=${status}`,
+        `/admin/hospitals?${params}`,
 
         { token: getToken() }
 
