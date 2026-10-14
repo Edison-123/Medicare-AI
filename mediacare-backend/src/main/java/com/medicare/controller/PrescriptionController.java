@@ -41,10 +41,10 @@ public class PrescriptionController {
     private final AuthorizationService authorizationService;
 
     public PrescriptionController(PrescriptionRepository prescriptionRepository,
-                                  NotificationRepository notificationRepository,
-                                  PatientRepository patientRepository,
-                                  CurrentUserService currentUserService,
-                                  AuthorizationService authorizationService) {
+            NotificationRepository notificationRepository,
+            PatientRepository patientRepository,
+            CurrentUserService currentUserService,
+            AuthorizationService authorizationService) {
         this.prescriptionRepository = prescriptionRepository;
         this.notificationRepository = notificationRepository;
         this.patientRepository = patientRepository;
@@ -84,7 +84,7 @@ public class PrescriptionController {
                         || (p.getStatus() != null && p.getStatus().equalsIgnoreCase(status)))
                 .filter(p -> normalizedQuery.isBlank()
                         || ((safe(p.getPatient()) + safe(p.getCode()) + safe(p.getDiagnosis()))
-                        .toLowerCase().contains(normalizedQuery)))
+                                .toLowerCase().contains(normalizedQuery)))
                 .toList();
 
         int start = Math.max(0, (page - 1) * size);
@@ -111,7 +111,8 @@ public class PrescriptionController {
     }
 
     private synchronized String generateUniqueRxCode() {
-        long base = 1000 + prescriptionRepository.findTopByOrderByIdDesc().map(p -> p.getId() + 1).orElse(prescriptionRepository.count() + 1);
+        long base = 1000 + prescriptionRepository.findTopByOrderByIdDesc().map(p -> p.getId() + 1)
+                .orElse(prescriptionRepository.count() + 1);
         String code = "RX-" + base;
         int suffix = 1;
         while (prescriptionRepository.existsByCode(code)) {
@@ -126,6 +127,7 @@ public class PrescriptionController {
     @Operation(summary = "Create new electronic prescription")
     public ResponseEntity<Prescription> create(@RequestBody Prescription rx) {
         Doctor doctor = currentUserService.getCurrentDoctor();
+        authorizationService.checkDoctorIsActive(doctor);
 
         if (rx.getPatientId() == null) {
             throw new ValidationException("Patient is required");
@@ -141,7 +143,8 @@ public class PrescriptionController {
         rx.setCode(generateUniqueRxCode());
         rx.setStatus("Draft");
         rx.setDate(LocalDate.now().toString());
-        if (rx.getRefillsLeft() == null) rx.setRefillsLeft(3);
+        if (rx.getRefillsLeft() == null)
+            rx.setRefillsLeft(3);
         rx.setQrVerification(null);
 
         if (rx.getItems() != null) {
@@ -156,7 +159,7 @@ public class PrescriptionController {
     @Transactional
     @Operation(summary = "Update prescription draft")
     public ResponseEntity<Prescription> update(@PathVariable Long id,
-                                                @RequestBody Prescription updated) {
+            @RequestBody Prescription updated) {
         Prescription rx = prescriptionRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Prescription not found"));
 
@@ -188,7 +191,7 @@ public class PrescriptionController {
     @Transactional
     @Operation(summary = "Transition prescription status (approve, finalize, cancel)")
     public ResponseEntity<Prescription> transition(@PathVariable Long id,
-                                                   @PathVariable String action) {
+            @PathVariable String action) {
         Prescription rx = prescriptionRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Prescription not found"));
 
@@ -212,8 +215,7 @@ public class PrescriptionController {
                     String.valueOf(rx.getPatientId()),
                     String.valueOf(rx.getDate()),
                     String.valueOf(rx.getDiagnosis()),
-                    "Finalized"
-            );
+                    "Finalized");
             rx.setQrVerification("MEDICARE-SIG-" + sha256Hex(dataToSign).substring(0, 16).toUpperCase(Locale.ROOT));
 
             if (rx.getPatientId() == null) {
@@ -225,11 +227,11 @@ public class PrescriptionController {
                     "patient",
                     rx.getPatientId(),
                     "Prescription Finalized & Certified",
-                    doctor.getName() + " has finalized prescription " + rx.getCode() + ". Digital verification QR attached.",
+                    doctor.getName() + " has finalized prescription " + rx.getCode()
+                            + ". Digital verification QR attached.",
                     "/patient/prescriptions",
                     "Just now",
-                    true
-            ));
+                    true));
 
         } else if ("cancel".equalsIgnoreCase(action)) {
             if ("Finalized".equalsIgnoreCase(rx.getStatus())) {

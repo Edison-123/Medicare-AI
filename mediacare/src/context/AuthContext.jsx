@@ -1,30 +1,56 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { authApi } from '../services/api'
 import { setUnauthorizedHandler } from '../services/api/client'
-import { saveSession, clearSession, loadSession, isExpired } from '../services/auth/session'
+import { saveSession, clearSession, loadSession } from '../services/auth/session'
 
 export const HOME = { ROLE_DOCTOR:'/doctor/dashboard', ROLE_PATIENT:'/patient/dashboard', ROLE_ADMIN:'/admin/dashboard' }
 const Ctx = createContext(null)
 export const useAuth = () => useContext(Ctx)
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(() => { const s = loadSession(); return s && !isExpired(s.token) ? s : null })
+  const [session, setSession] = useState(() => loadSession())
   const [expired, setExpired] = useState(false)
-  const logout = useCallback((wasExpired = false) => { clearSession(); setSession(null); setExpired(wasExpired === true) }, [])
+  const [ready, setReady] = useState(false)
+  const authGeneration = useRef(0)
+  const logout = useCallback(async (wasExpired = false) => {
+    authGeneration.current += 1
+    if (!wasExpired) {
+      try { await authApi.logout() } catch { /* Clear the local session even if the server is unavailable. */ }
+    }
+    clearSession()
+    setSession(null)
+    setExpired(wasExpired === true)
+    setReady(true)
+  }, [])
 
-  useEffect(() => { setUnauthorizedHandler(() => logout(true)) }, [logout])
   useEffect(() => {
-    if (!session) return
-    const t = setInterval(() => isExpired(session.token) && logout(true), 30000)
-    return () => clearInterval(t)
-  }, [session, logout])
+    setUnauthorizedHandler(() => { void logout(true) })
+    const generation = authGeneration.current
+    authApi.me().then(user => {
+      if (authGeneration.current !== generation) return
+      const nextSession = { user }
+      saveSession(nextSession)
+      setSession(nextSession)
+    }).catch(() => {
+      if (authGeneration.current !== generation) return
+      clearSession()
+      setSession(null)
+    }).finally(() => {
+      if (authGeneration.current === generation) setReady(true)
+    })
+  }, [logout])
 
   const login = async (email, password) => {
-    const s = await authApi.login(email.trim(), password)
-    if (!s?.token || !s?.user?.role) throw new Error('Invalid authentication response from server')
-    saveSession(s); setSession(s); setExpired(false)
-    return s.user
+    authGeneration.current += 1
+    setReady(true)
+    const user = await authApi.login(email.trim(), password)
+    if (!user?.role) throw new Error('Invalid authentication response from server')
+    const nextSession = { user }
+    saveSession(nextSession)
+    setSession(nextSession)
+    setExpired(false)
+    return user
   }
 
-  return <Ctx.Provider value={{ user: session?.user, login, logout, expired }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ user: session?.user, login, logout, expired, ready }}>{children}</Ctx.Provider>
 }

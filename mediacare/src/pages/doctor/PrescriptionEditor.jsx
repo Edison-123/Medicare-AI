@@ -13,21 +13,32 @@ export default function PrescriptionEditor() {
   const { prescriptionId } = useParams(); const [sp] = useSearchParams()
   const { data, loading, error, reload } = useAsync(async () => {
     const patients = (await patientsApi.list({ size:100 })).items
-    if (prescriptionId) return { patients, rx: await prescriptionsApi.get(prescriptionId) }
+    if (prescriptionId) return { patients, rx: await prescriptionsApi.get(prescriptionId), clinicalInfo:'' }
     const rx = { ...blank(), patientId: sp.get('patientId') ? Number(sp.get('patientId')) : '' }
+    let clinicalInfo = ''
     const cid = sp.get('consultationId')
-    if (cid) { const c = await consultationsApi.get(cid); Object.assign(rx, { patientId:c.patientId, diagnosis:c.form.diagnosis, notes:c.form.plan, followUp:c.form.followUp }) }
-    return { patients, rx }
+    if (cid) {
+      const c = await consultationsApi.get(cid)
+      const form = c.form || {}
+      Object.assign(rx, {
+        patientId:c.patientId,
+        diagnosis:form.diagnosis || '',
+        notes:[form.plan, form.followUp].filter(Boolean).join('\n'),
+        followUp:''
+      })
+      clinicalInfo = [form.symptoms, form.exam, form.medications, form.plan, form.followUp].filter(Boolean).join('\n')
+    }
+    return { patients, rx, clinicalInfo }
   }, [prescriptionId, sp.toString()])
   if (loading) return <LoadingState label="Loading prescription…" />
   if (error) return <ErrorState message={error} onRetry={reload} />
-  return <Editor key={data.rx.id ?? 'new'} patients={data.patients} initial={data.rx} />
+  return <Editor key={data.rx.id ?? 'new'} patients={data.patients} initial={data.rx} initialClinicalInfo={data.clinicalInfo} />
 }
 
-function Editor({ patients, initial }) {
+function Editor({ patients, initial, initialClinicalInfo }) {
   const nav = useNavigate()
   const [rx, setRx] = useState(initial), [errs, setErrs] = useState({}), [busy, setBusy] = useState(false), [msg, setMsg] = useState(null), [dialog, setDialog] = useState(null)
-  const [aiNote, setAiNote] = useState(''), [aiBusy, setAiBusy] = useState(false), [aiDraft, setAiDraft] = useState(null)
+  const [aiNote, setAiNote] = useState(initialClinicalInfo || ''), [aiBusy, setAiBusy] = useState(false), [aiDraft, setAiDraft] = useState(null)
   const locked = ['Finalized', 'Cancelled'].includes(rx.status)
   const patient = patients.find(p => p.id === Number(rx.patientId))
   const set = (k, v) => setRx(r => ({ ...r, [k]: v }))
@@ -75,7 +86,6 @@ function Editor({ patients, initial }) {
         <div className="row" style={{ marginTop: 10 }}><button className="btn btn-primary" onClick={generate} disabled={aiBusy || busy}><Sparkles size={16} /> {aiBusy ? 'Generating…' : 'Generate with AI'}</button>
           <span className="muted small">Suggestions are never added automatically.</span></div>
         {aiDraft && <div className="draft"><AIDraftBanner />
-          {aiDraft.provider?.startsWith('mock') && <div className="alert">Demo mode: suggestions are fixed sample text from a mock provider.</div>}
           <ul className="list">{aiDraft.items.map((i, k) => <li key={k}><div className="grow"><strong>{i.name} {i.strength}</strong><div className="muted small">{i.dosage} • {i.frequency} • {i.duration} • {i.food}</div></div></li>)}</ul>
           <div className="row"><button className="btn btn-primary" onClick={addAi}>Add to prescription</button><button className="btn" onClick={() => setAiDraft(null)}>Discard</button></div></div>}
       </Card>}

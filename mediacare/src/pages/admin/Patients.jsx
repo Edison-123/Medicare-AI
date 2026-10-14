@@ -10,11 +10,6 @@ import {
   EmptyState, Modal
 } from '../../components/common/ui'
 
-const HOSPITALS = [
-  'All', 'MediCare Central Hospital', 'St. Jude Community Health',
-  'Apex Heart & Lung Institute', 'Metro Children\'s Clinic', 'Westside Urgent Care'
-]
-
 export default function AdminPatients() {
   const [search, setSearch] = useState('')
   const [hospital, setHospital] = useState('All')
@@ -25,6 +20,7 @@ export default function AdminPatients() {
     () => adminApi.getPatients({ q: debouncedSearch, hospital, riskCategory: risk }),
     [debouncedSearch, hospital, risk]
   )
+  const { data: hospitals } = useAsync(adminApi.getHospitals)
 
   const [inspectPatient, setInspectPatient] = useState(null)
   const [updatingId, setUpdatingId] = useState(null)
@@ -89,8 +85,9 @@ export default function AdminPatients() {
         <div className="row">
           <label className="field" style={{ minWidth: 180 }}>
             <select value={hospital} onChange={e => setHospital(e.target.value)}>
-              {HOSPITALS.map(h => (
-                <option key={h} value={h}>Hospital: {h}</option>
+              <option value="All">All hospitals</option>
+              {(hospitals || []).map(h => (
+                <option key={h.id} value={h.name}>{h.name}</option>
               ))}
             </select>
           </label>
@@ -276,10 +273,10 @@ export default function AdminPatients() {
               </dd>
 
               <dt>Registration Date</dt>
-              <dd>{inspectPatient.registeredDate || '2024-01-10'}</dd>
+              <dd>{inspectPatient.registeredDate || 'Not recorded'}</dd>
 
-              <dt>EMR Access Token</dt>
-              <dd><code>MC-PAT-TOKEN-{inspectPatient.id}-HIPAA-OK</code></dd>
+              <dt>Health Card Number</dt>
+              <dd><code>{inspectPatient.healthCardNumber || 'Not on file'}</code></dd>
             </div>
 
             <div className="row end">

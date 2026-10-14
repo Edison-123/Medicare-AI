@@ -150,8 +150,7 @@ export default function AdminSettings() {
                     value={form.aiEngine.ocrEngine}
                     onChange={e => setForm({ ...form, aiEngine: { ...form.aiEngine, ocrEngine: e.target.value } })}
                   >
-                    <option value="medicare-vision-ocr-pro">MediCare Vision OCR Pro (94.2% ink accuracy)</option>
-                    <option value="tesseract-med-v2">Tesseract Medical V2</option>
+                    <option value="microsoft-trocr">Microsoft TrOCR (local handwritten model)</option>
                   </select>
                 </label>
 

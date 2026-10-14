@@ -25,14 +25,12 @@ export default function CommandPalette({ isOpen, onClose, role }) {
     if (role === 'doctor') {
       return [
         { group: 'Quick Navigation', title: 'Dashboard', desc: 'Overview, pending refills & today schedule', link: '/doctor/dashboard', icon: Activity },
-        { group: 'Quick Navigation', title: 'Patients Directory', desc: 'Search records, clinical history, timeline', link: '/doctor/patients', icon: Users },
+        { group: 'Quick Navigation', title: 'Patients Directory', desc: 'Open the assigned patient directory', link: '/doctor/patients', icon: Users },
         { group: 'Quick Navigation', title: 'Consultations & AI Scribe', desc: 'Real-time ambient listening & note drafting', link: '/doctor/consultations', icon: Stethoscope },
         { group: 'Quick Navigation', title: 'Prescriptions Hub', desc: 'Review, seal & issue verified digital scripts', link: '/doctor/prescriptions', icon: FileText },
         { group: 'Quick Navigation', title: 'AI Clinical Tools', desc: 'Drug interactions & SOAP summarizer', link: '/doctor/ai-tools', icon: Sparkles },
         { group: 'Quick Navigation', title: 'Analytics & Reports', desc: 'Practice KPIs, patient trends & audit logs', link: '/doctor/reports', icon: ClipboardList },
         { group: 'Quick Actions', title: 'New Prescription Draft', desc: 'Start an electronic prescription draft', link: '/doctor/prescriptions/new', icon: FileText },
-        { group: 'Clinical Records', title: 'John Doe (Patient #101)', desc: '42y Male • Stage 1 Hypertension • Next visit Oct 12', link: '/doctor/patients/101', icon: Users },
-        { group: 'Clinical Records', title: 'Sarah Wilson (Patient #102)', desc: '35y Female • Moderate Asthma • ICS-formoterol', link: '/doctor/patients/102', icon: Users },
       ]
     }
 
@@ -57,9 +55,7 @@ export default function CommandPalette({ isOpen, onClose, role }) {
       { group: 'Quick Navigation', title: 'Lab Test Results', desc: 'Diagnostic blood panels, reference ranges & charts', link: '/patient/lab-tests', icon: FlaskConical },
       { group: 'Quick Navigation', title: 'Medicine Reminders', desc: 'Daily pill adherence tracker & refill warnings', link: '/patient/medicine-reminders', icon: Pill },
       { group: 'Quick Navigation', title: 'Medical Records & Allergies', desc: 'Chronic conditions, uploaded scans & documents', link: '/patient/medical-records', icon: Shield },
-      { group: 'Quick Navigation', title: 'Doctor Messages', desc: 'Direct secure chat with Dr. John Smith', link: '/patient/messages', icon: MessageSquare },
-      { group: 'Medications on File', title: 'Amlodipine 5mg', desc: 'Blood pressure • 1 tablet daily at morning', link: '/patient/prescriptions', icon: Pill },
-      { group: 'Medications on File', title: 'Metformin 500mg', desc: 'Blood sugar control • 1 tablet with evening meal', link: '/patient/prescriptions', icon: Pill },
+      { group: 'Quick Navigation', title: 'Doctor Messages', desc: 'Direct secure chat with your care team', link: '/patient/messages', icon: MessageSquare },
     ]
   }
 
@@ -117,7 +113,7 @@ export default function CommandPalette({ isOpen, onClose, role }) {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder={`Search ${role} commands, records, medicines, or pages…`}
+            placeholder={`Search ${role} pages and navigation commands…`}
             aria-label="Command search"
           />
           {query && (
@@ -134,7 +130,7 @@ export default function CommandPalette({ isOpen, onClose, role }) {
         <div className="cmd-results">
           {filteredItems.length === 0 ? (
             <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: '0.9rem' }}>
-              No commands or records matching "<strong>{query}</strong>"
+              No pages or navigation commands matching "<strong>{query}</strong>"
             </div>
           ) : (
             Object.entries(groups).map(([groupTitle, items]) => (
@@ -172,7 +168,7 @@ export default function CommandPalette({ isOpen, onClose, role }) {
             <span><span className="cmd-shortcut">↵</span> Select</span>
           </div>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Sparkles size={12} color="var(--primary)" /> MediCare Quick Search
+            <Sparkles size={12} color="var(--primary)" /> MediCare Quick Navigation
           </span>
         </div>
       </div>

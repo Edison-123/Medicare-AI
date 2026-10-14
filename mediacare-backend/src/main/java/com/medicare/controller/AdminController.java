@@ -36,8 +36,11 @@ public class AdminController {
     @GetMapping("/doctors")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get registered doctors list")
-    public ResponseEntity<List<Doctor>> getDoctors() {
-        return ResponseEntity.ok(adminService.getDoctors());
+    public ResponseEntity<List<Doctor>> getDoctors(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "All") String department,
+            @RequestParam(defaultValue = "All") String status) {
+        return ResponseEntity.ok(adminService.getDoctors(q, department, status));
     }
 
     @PostMapping("/doctors")
@@ -59,8 +62,11 @@ public class AdminController {
     @GetMapping("/patients")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get master patients directory")
-    public ResponseEntity<List<Patient>> getPatients() {
-        return ResponseEntity.ok(adminService.getPatients());
+    public ResponseEntity<List<Patient>> getPatients(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "All") String hospital,
+            @RequestParam(defaultValue = "All") String risk) {
+        return ResponseEntity.ok(adminService.getPatients(q, hospital, risk));
     }
 
     @PostMapping("/patients")
@@ -99,15 +105,19 @@ public class AdminController {
     @GetMapping("/prescriptions-audit")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get compliance and cryptographic prescription audit trail")
-    public ResponseEntity<List<Map<String, Object>>> getPrescriptionsAudit() {
-        return ResponseEntity.ok(adminService.getPrescriptionsAudit());
+    public ResponseEntity<List<Map<String, Object>>> getPrescriptionsAudit(
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "All") String flag,
+            @RequestParam(defaultValue = "All") String status) {
+        return ResponseEntity.ok(adminService.getPrescriptionsAudit(q, flag, status));
     }
 
     @GetMapping("/reports")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get platform-wide analytics and compliance KPIs")
-    public ResponseEntity<Map<String, Object>> getReports() {
-        return ResponseEntity.ok(adminService.getReports());
+    public ResponseEntity<Map<String, Object>> getReports(
+            @RequestParam(defaultValue = "30d") String timeframe) {
+        return ResponseEntity.ok(adminService.getReports(timeframe));
     }
 
     @GetMapping("/settings")
@@ -127,8 +137,11 @@ public class AdminController {
     @GetMapping("/system-logs")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get security and system audit logs")
-    public ResponseEntity<List<SystemLog>> getSystemLogs() {
-        return ResponseEntity.ok(adminService.getSystemLogs());
+    public ResponseEntity<List<SystemLog>> getSystemLogs(
+            @RequestParam(defaultValue = "All") String level,
+            @RequestParam(defaultValue = "All") String component,
+            @RequestParam(defaultValue = "") String q) {
+        return ResponseEntity.ok(adminService.getSystemLogs(level, component, q));
     }
 
     @PostMapping("/system-logs/clear")

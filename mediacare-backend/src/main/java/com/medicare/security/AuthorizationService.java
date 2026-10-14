@@ -52,8 +52,15 @@ public class AuthorizationService {
         }
 
         Doctor doctor = currentUserService.getCurrentDoctor();
+        checkDoctorIsActive(doctor);
         if (!Objects.equals(prescription.getDoctorId(), doctor.getId())) {
             throw new ForbiddenException("Prescription does not belong to the authenticated doctor");
+        }
+    }
+
+    public void checkDoctorIsActive(Doctor doctor) {
+        if (!"Active".equalsIgnoreCase(doctor.getStatus())) {
+            throw new ForbiddenException("Doctor account is not active. Contact an administrator.");
         }
     }
 

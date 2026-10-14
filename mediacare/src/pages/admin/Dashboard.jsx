@@ -34,7 +34,7 @@ export default function AdminDashboard() {
         actions={
           <div className="row">
             <span className="row" style={{ fontSize: '0.85rem', color: 'var(--muted)', background: '#fff', border: '1px solid var(--line)', padding: '6px 12px', borderRadius: 10 }}>
-              <span className="ping-indicator" /> System Status: <strong style={{ color: 'var(--green)' }}>Healthy (99.98% Uptime)</strong>
+              System Status: <strong>Not reported</strong>
             </span>
             <Link to="/admin/doctors" className="btn btn-primary">
               <Stethoscope size={15} /> Manage Doctors
@@ -67,17 +67,17 @@ export default function AdminDashboard() {
             <div className="card" style={{ padding: 14 }}>
               <div className="muted small">API Gateway Latency</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' }}>
-                {data.systemHealth.apiLatencyMs} ms
+                {data.systemHealth.apiLatencyMs == null ? 'Not reported' : `${data.systemHealth.apiLatencyMs} ms`}
               </div>
-              <div className="small muted">Optimal response time</div>
+              <div className="small muted">Reported API latency</div>
             </div>
 
             <div className="card" style={{ padding: 14 }}>
               <div className="muted small">AI Inference Latency</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary)' }}>
-                {data.systemHealth.aiInferenceSec} s
+                {data.systemHealth.aiInferenceSec == null ? 'Not reported' : `${data.systemHealth.aiInferenceSec} s`}
               </div>
-              <div className="small muted">Whisper-Large-v3 GPU cluster</div>
+              <div className="small muted">Reported inference latency</div>
             </div>
 
             <div className="card" style={{ padding: 14 }}>
@@ -85,16 +85,16 @@ export default function AdminDashboard() {
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' }}>
                 {data.systemHealth.dbConnections}
               </div>
-              <div className="small muted">18 active pooled sockets</div>
+              <div className="small muted">Reported connections</div>
             </div>
 
             <div className="card" style={{ padding: 14 }}>
               <div className="muted small">Encrypted Storage Usage</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' }}>
-                {data.systemHealth.storageUsedPercent}%
+                {data.systemHealth.storageUsedPercent == null ? 'Not reported' : `${data.systemHealth.storageUsedPercent}%`}
               </div>
               <div className="progress-bar-wrap" style={{ marginTop: 6 }}>
-                <div className="progress-bar-fill" style={{ width: `${data.systemHealth.storageUsedPercent}%`, background: 'var(--primary)' }} />
+                <div className="progress-bar-fill" style={{ width: `${data.systemHealth.storageUsedPercent ?? 0}%`, background: 'var(--primary)' }} />
               </div>
             </div>
           </div>

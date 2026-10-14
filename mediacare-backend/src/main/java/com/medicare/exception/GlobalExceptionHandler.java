@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -35,6 +36,12 @@ public class GlobalExceptionHandler {
                 .orElse("Request validation failed");
 
         return ResponseEntity.badRequest().body(ApiError.of(400, message));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(NoResourceFoundException ex, HttpServletRequest request) {
+        String message = "No endpoint for " + request.getMethod() + " " + request.getRequestURI();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(404, message));
     }
 
     @ExceptionHandler(Exception.class)

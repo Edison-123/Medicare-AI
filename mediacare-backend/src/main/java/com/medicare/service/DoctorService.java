@@ -9,6 +9,7 @@ import com.medicare.exception.NotFoundException;
 import com.medicare.exception.ValidationException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -16,296 +17,354 @@ import java.util.*;
 @Service
 public class DoctorService {
 
-    private final DoctorRepository doctorRepository;
-    private final RefillRequestRepository refillRequestRepository;
-    private final PrescriptionRepository prescriptionRepository;
-    private final AppointmentRepository appointmentRepository;
-    private final NotificationRepository notificationRepository;
-    private final ConsultationRepository consultationRepository;
-    private final UserSettingsService userSettingsService;
-    private final CurrentUserService currentUserService;
+        private final DoctorRepository doctorRepository;
+        private final PatientRepository patientRepository;
+        private final RefillRequestRepository refillRequestRepository;
+        private final PrescriptionRepository prescriptionRepository;
+        private final AppointmentRepository appointmentRepository;
+        private final NotificationRepository notificationRepository;
+        private final ConsultationRepository consultationRepository;
+        private final UserSettingsService userSettingsService;
+        private final CurrentUserService currentUserService;
 
-    public DoctorService(DoctorRepository doctorRepository,
-            RefillRequestRepository refillRequestRepository,
-            PrescriptionRepository prescriptionRepository,
-            AppointmentRepository appointmentRepository,
-            NotificationRepository notificationRepository,
-            ConsultationRepository consultationRepository,
-            UserSettingsService userSettingsService,
-            CurrentUserService currentUserService) {
-        this.doctorRepository = doctorRepository;
-        this.refillRequestRepository = refillRequestRepository;
-        this.prescriptionRepository = prescriptionRepository;
-        this.appointmentRepository = appointmentRepository;
-        this.notificationRepository = notificationRepository;
-        this.consultationRepository = consultationRepository;
-        this.userSettingsService = userSettingsService;
-        this.currentUserService = currentUserService;
-    }
-
-    public Map<String, Object> getDashboard() {
-        Doctor doctor = currentUserService.getCurrentDoctor();
-        List<Prescription> doctorRx = prescriptionRepository.findByDoctorId(doctor.getId());
-        List<Appointment> doctorAppts = appointmentRepository.findByDoctorId(doctor.getId());
-        List<com.medicare.entity.Consultation> doctorConsults = consultationRepository.findByDoctorId(doctor.getId());
-
-        long activePatientCount = doctorAppts.stream().map(Appointment::getPatientId).filter(Objects::nonNull)
-                .distinct().count();
-        long completedConsultations = doctorConsults.stream().filter(c -> "Completed".equalsIgnoreCase(c.getStatus()))
-                .count();
-        long aiAssisted = doctorConsults.stream()
-                .filter(c -> c.getAiStateJson() != null && !c.getAiStateJson().isBlank()).count();
-        long followUpsDue = doctorAppts.stream().filter(a -> "Scheduled".equalsIgnoreCase(a.getStatus())).count();
-
-        List<Map<String, Object>> stats = List.of(
-                Map.of("key", "patients", "value", String.valueOf(activePatientCount), "label", "Active Patients",
-                        "delta", "Database records", "tone", "blue"),
-                Map.of("key", "rx", "value", String.valueOf(doctorRx.size()), "label", "Prescriptions Issued", "delta",
-                        "Database records", "tone", "green"),
-                Map.of("key", "ai", "value",
-                        doctorConsults.isEmpty() ? "0%"
-                                : String.format(Locale.ROOT, "%.1f%%", (aiAssisted * 100.0) / doctorConsults.size()),
-                        "label", "AI-Assisted Consultations", "delta", "Tracked from consultations", "tone", "purple"),
-                Map.of("key", "follow", "value", String.valueOf(followUpsDue), "label", "Follow-ups Due", "link",
-                        "View all", "tone", "orange"));
-
-        Map<String, Object> dashboard = new LinkedHashMap<>();
-        dashboard.put("stats", stats);
-        dashboard.put("appointments", doctorAppts.stream().limit(5).map(a -> Map.of(
-                "id", a.getId(),
-                "patient", a.getPatient() != null ? a.getPatient() : "Patient",
-                "time", a.getTime() != null ? a.getTime() : "Not scheduled",
-                "type", a.getType() != null ? a.getType() : "In-person OPD",
-                "status", a.getStatus() != null ? a.getStatus() : "Scheduled")).toList());
-
-        dashboard.put("aiOverview", Map.of(
-                "total", doctorConsults.size(),
-                "accuracy", 0,
-                "parts", List.of(
-                        Map.of("label", "Consultations with AI state", "value", aiAssisted),
-                        Map.of("label", "Consultations without AI state", "value",
-                                Math.max(0, doctorConsults.size() - aiAssisted)))));
-
-        dashboard.put("recentRx", doctorRx.stream()
-                .sorted(Comparator.comparing(Prescription::getId, Comparator.nullsLast(Long::compareTo)).reversed())
-                .limit(5).map(rx -> Map.of(
-                        "id", rx.getId(),
-                        "patient", rx.getPatient() != null ? rx.getPatient() : "Patient",
-                        "when", (rx.getDate() != null ? rx.getDate() : "Recent") + " · " + rx.getCode(),
-                        "status", rx.getStatus() != null ? rx.getStatus() : "Draft"))
-                .toList());
-        return dashboard;
-    }
-
-    public List<RefillRequest> getPendingRefills() {
-        Doctor doctor = currentUserService.getCurrentDoctor();
-        return refillRequestRepository.findByStatus("Pending").stream()
-                .filter(req -> req.getPrescriptionId() != null)
-                .filter(req -> prescriptionRepository.findById(req.getPrescriptionId())
-                        .map(rx -> Objects.equals(rx.getDoctorId(), doctor.getId()))
-                        .orElse(false))
-                .toList();
-    }
-
-    @org.springframework.transaction.annotation.Transactional
-    public ApiResponse respondRefill(Long refillId, String action, String reason) {
-        Doctor doctor = currentUserService.getCurrentDoctor();
-        RefillRequest req = refillRequestRepository.findById(refillId)
-                .orElseThrow(() -> new NotFoundException("Refill request not found"));
-        if (!"Pending".equalsIgnoreCase(req.getStatus())) {
-            throw new ValidationException("This refill request has already been processed");
-        }
-        Prescription prescription = prescriptionRepository.findById(req.getPrescriptionId())
-                .orElseThrow(() -> new NotFoundException("Prescription not found"));
-        if (!Objects.equals(prescription.getDoctorId(), doctor.getId())) {
-            throw new ForbiddenException("You do not have access to this refill request");
+        public DoctorService(DoctorRepository doctorRepository,
+                        PatientRepository patientRepository,
+                        RefillRequestRepository refillRequestRepository,
+                        PrescriptionRepository prescriptionRepository,
+                        AppointmentRepository appointmentRepository,
+                        NotificationRepository notificationRepository,
+                        ConsultationRepository consultationRepository,
+                        UserSettingsService userSettingsService,
+                        CurrentUserService currentUserService) {
+                this.doctorRepository = doctorRepository;
+                this.patientRepository = patientRepository;
+                this.refillRequestRepository = refillRequestRepository;
+                this.prescriptionRepository = prescriptionRepository;
+                this.appointmentRepository = appointmentRepository;
+                this.notificationRepository = notificationRepository;
+                this.consultationRepository = consultationRepository;
+                this.userSettingsService = userSettingsService;
+                this.currentUserService = currentUserService;
         }
 
-        if ("approve".equalsIgnoreCase(action)) {
-            int remaining = prescription.getRefillsLeft() == null ? 0 : prescription.getRefillsLeft();
-            if (remaining <= 0) {
-                throw new ValidationException("No authorized refills remain on this prescription");
-            }
-            prescription.setRefillsLeft(remaining - 1);
-            prescriptionRepository.save(prescription);
-            req.setStatus("Approved");
-            notificationRepository.save(new Notification(
-                    "patient", req.getPatientId(), "Refill Request Approved",
-                    doctor.getName() + " approved your refill for " + req.getMedicine() + ". " + (remaining - 1)
-                            + " refill(s) remain.",
-                    "/patient/prescriptions", "Just now", true));
-        } else if ("visit".equalsIgnoreCase(action) || "reject".equalsIgnoreCase(action)) {
-            req.setStatus("Visit Required");
-            if (reason != null && !reason.isBlank())
-                req.setNotes(reason.trim());
-            notificationRepository.save(new Notification(
-                    "patient", req.getPatientId(), "Clinic Visit Needed for Refill",
-                    doctor.getName() + " requested an in-person clinic evaluation before renewing " + req.getMedicine()
-                            + ".",
-                    "/patient/appointments", "Just now", true));
-        } else {
-            throw new ValidationException("Unsupported refill action: " + action);
+        public Map<String, Object> getDashboard() {
+                Doctor doctor = currentUserService.getCurrentDoctor();
+                List<Prescription> doctorRx = prescriptionRepository.findByDoctorId(doctor.getId());
+                List<Appointment> doctorAppts = appointmentRepository.findByDoctorId(doctor.getId());
+                List<com.medicare.entity.Consultation> doctorConsults = consultationRepository
+                                .findByDoctorId(doctor.getId());
+
+                long activePatientCount = patientRepository.findAll().stream()
+                                .filter(patient -> "Active".equalsIgnoreCase(patient.getStatus()))
+                                .count();
+                long completedConsultations = doctorConsults.stream()
+                                .filter(c -> "Completed".equalsIgnoreCase(c.getStatus()))
+                                .count();
+                long aiAssisted = doctorConsults.stream()
+                                .filter(c -> c.getAiStateJson() != null && !c.getAiStateJson().isBlank()).count();
+                long followUpsDue = doctorAppts.stream().filter(a -> "Scheduled".equalsIgnoreCase(a.getStatus()))
+                                .count();
+
+                List<Map<String, Object>> stats = List.of(
+                                Map.of("key", "patients", "value", String.valueOf(activePatientCount), "label",
+                                                "Active Patients",
+                                                "delta", "Database records", "tone", "blue"),
+                                Map.of("key", "rx", "value", String.valueOf(doctorRx.size()), "label",
+                                                "Prescriptions Issued", "delta",
+                                                "Database records", "tone", "green"),
+                                Map.of("key", "ai", "value",
+                                                doctorConsults.isEmpty() ? "0%"
+                                                                : String.format(Locale.ROOT, "%.1f%%",
+                                                                                (aiAssisted * 100.0) / doctorConsults
+                                                                                                .size()),
+                                                "label", "AI-Assisted Consultations", "delta",
+                                                "Tracked from consultations", "tone", "purple"),
+                                Map.of("key", "follow", "value", String.valueOf(followUpsDue), "label",
+                                                "Follow-ups Due", "link",
+                                                "View all", "tone", "orange"));
+
+                Map<String, Object> dashboard = new LinkedHashMap<>();
+                dashboard.put("stats", stats);
+                dashboard.put("appointments", doctorAppts.stream().limit(5).map(a -> Map.of(
+                                "id", a.getId(),
+                                "patient", a.getPatient() != null ? a.getPatient() : "Patient",
+                                "time", a.getTime() != null ? a.getTime() : "Not scheduled",
+                                "type", a.getType() != null ? a.getType() : "In-person OPD",
+                                "status", a.getStatus() != null ? a.getStatus() : "Scheduled")).toList());
+
+                Map<String, Object> aiOverview = new LinkedHashMap<>();
+                aiOverview.put("total", doctorConsults.size());
+                aiOverview.put("accuracy", null);
+                aiOverview.put("parts", List.of(
+                                Map.of("label", "Consultations with AI state", "value", aiAssisted),
+                                Map.of("label", "Consultations without AI state", "value",
+                                                Math.max(0, doctorConsults.size() - aiAssisted))));
+                dashboard.put("aiOverview", aiOverview);
+
+                dashboard.put("recentRx", doctorRx.stream()
+                                .sorted(Comparator.comparing(Prescription::getId, Comparator.nullsLast(Long::compareTo))
+                                                .reversed())
+                                .limit(5).map(rx -> Map.of(
+                                                "id", rx.getId(),
+                                                "patient", rx.getPatient() != null ? rx.getPatient() : "Patient",
+                                                "when",
+                                                (rx.getDate() != null ? rx.getDate() : "Recent") + " · " + rx.getCode(),
+                                                "status", rx.getStatus() != null ? rx.getStatus() : "Draft"))
+                                .toList());
+                return dashboard;
         }
 
-        refillRequestRepository.save(req);
-        return new ApiResponse(true, "Refill processed successfully", req.getStatus());
-    }
-
-    public Map<String, Object> getReports(String timeframe) {
-        Doctor doctor = currentUserService.getCurrentDoctor();
-        List<Consultation> consultations = consultationRepository.findByDoctorId(doctor.getId());
-        List<Prescription> prescriptions = prescriptionRepository.findByDoctorId(doctor.getId());
-
-        long completed = consultations.stream().filter(c -> "Completed".equalsIgnoreCase(c.getStatus())).count();
-        long aiAssisted = consultations.stream()
-                .filter(c -> c.getAiStateJson() != null && !c.getAiStateJson().isBlank()).count();
-        long allergyAlerts = prescriptions.stream()
-                .filter(p -> p.getNotes() != null && p.getNotes().toLowerCase(Locale.ROOT).contains("warning")).count();
-
-        Map<YearMonth, Long> monthlyConsultations = new LinkedHashMap<>();
-        Map<YearMonth, Long> monthlyPrescriptions = new LinkedHashMap<>();
-        Map<YearMonth, Long> monthlyAi = new LinkedHashMap<>();
-        YearMonth current = YearMonth.now();
-        for (int i = 5; i >= 0; i--)
-            monthlyConsultations.put(current.minusMonths(i), 0L);
-        monthlyPrescriptions.putAll(monthlyConsultations);
-        monthlyAi.putAll(monthlyConsultations);
-
-        for (Consultation c : consultations) {
-            try {
-                YearMonth ym = YearMonth.parse(c.getDate().substring(0, 7));
-                monthlyConsultations.computeIfPresent(ym, (k, v) -> v + 1);
-                if (c.getAiStateJson() != null && !c.getAiStateJson().isBlank())
-                    monthlyAi.computeIfPresent(ym, (k, v) -> v + 1);
-            } catch (Exception ignored) {
-            }
-        }
-        for (Prescription rx : prescriptions) {
-            try {
-                YearMonth ym = YearMonth.parse(rx.getDate().substring(0, 7));
-                monthlyPrescriptions.computeIfPresent(ym, (k, v) -> v + 1);
-            } catch (Exception ignored) {
-            }
+        public List<RefillRequest> getPendingRefills() {
+                Doctor doctor = currentUserService.getCurrentDoctor();
+                return refillRequestRepository.findByStatus("Pending").stream()
+                                .filter(req -> req.getPrescriptionId() != null)
+                                .filter(req -> prescriptionRepository.findById(req.getPrescriptionId())
+                                                .map(rx -> Objects.equals(rx.getDoctorId(), doctor.getId()))
+                                                .orElse(false))
+                                .toList();
         }
 
-        List<Map<String, Object>> monthlyTrends = monthlyConsultations.keySet().stream().map(ym -> {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("month", ym.format(DateTimeFormatter.ofPattern("MMM")));
-            item.put("consultations", monthlyConsultations.get(ym));
-            item.put("prescriptions", monthlyPrescriptions.get(ym));
-            item.put("aiDrafts", monthlyAi.get(ym));
-            return item;
-        }).toList();
+        @org.springframework.transaction.annotation.Transactional
+        public ApiResponse respondRefill(Long refillId, String action, String reason) {
+                Doctor doctor = currentUserService.getCurrentDoctor();
+                RefillRequest req = refillRequestRepository.findById(refillId)
+                                .orElseThrow(() -> new NotFoundException("Refill request not found"));
+                if (!"Pending".equalsIgnoreCase(req.getStatus())) {
+                        throw new ValidationException("This refill request has already been processed");
+                }
+                Prescription prescription = prescriptionRepository.findById(req.getPrescriptionId())
+                                .orElseThrow(() -> new NotFoundException("Prescription not found"));
+                if (!Objects.equals(prescription.getDoctorId(), doctor.getId())) {
+                        throw new ForbiddenException("You do not have access to this refill request");
+                }
 
-        Map<String, Long> conditions = new HashMap<>();
-        prescriptions.stream().map(Prescription::getDiagnosis).filter(Objects::nonNull).filter(v -> !v.isBlank())
-                .forEach(d -> conditions.merge(d, 1L, Long::sum));
-        long conditionTotal = Math.max(1, conditions.values().stream().mapToLong(Long::longValue).sum());
-        List<Map<String, Object>> topConditions = conditions.entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()).limit(5)
-                .map(e -> {
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("label", e.getKey());
-                    item.put("count", e.getValue());
-                    item.put("percentage", Math.round(e.getValue() * 100.0 / conditionTotal));
-                    return item;
-                })
-                .toList();
+                if ("approve".equalsIgnoreCase(action)) {
+                        int remaining = prescription.getRefillsLeft() == null ? 0 : prescription.getRefillsLeft();
+                        if (remaining <= 0) {
+                                throw new ValidationException("No authorized refills remain on this prescription");
+                        }
+                        prescription.setRefillsLeft(remaining - 1);
+                        prescriptionRepository.save(prescription);
+                        req.setStatus("Approved");
+                        notificationRepository.save(new Notification(
+                                        "patient", req.getPatientId(), "Refill Request Approved",
+                                        doctor.getName() + " approved your refill for " + req.getMedicine() + ". "
+                                                        + (remaining - 1)
+                                                        + " refill(s) remain.",
+                                        "/patient/prescriptions", "Just now", true));
+                } else if ("visit".equalsIgnoreCase(action) || "reject".equalsIgnoreCase(action)) {
+                        req.setStatus("Visit Required");
+                        if (reason != null && !reason.isBlank())
+                                req.setNotes(reason.trim());
+                        notificationRepository.save(new Notification(
+                                        "patient", req.getPatientId(), "Clinic Visit Needed for Refill",
+                                        doctor.getName() + " requested an in-person clinic evaluation before renewing "
+                                                        + req.getMedicine()
+                                                        + ".",
+                                        "/patient/appointments", "Just now", true));
+                } else {
+                        throw new ValidationException("Unsupported refill action: " + action);
+                }
 
-        Map<String, Long> classes = new HashMap<>();
-        prescriptions.stream()
-                .flatMap(p -> p.getItems() == null ? java.util.stream.Stream.empty() : p.getItems().stream())
-                .map(PrescriptionItem::getName).filter(Objects::nonNull)
-                .forEach(name -> classes.merge(classifyMedication(name), 1L, Long::sum));
-        long drugTotal = Math.max(1, classes.values().stream().mapToLong(Long::longValue).sum());
-        List<Map<String, Object>> prescribedDrugClasses = classes.entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()).limit(5)
-                .map(e -> {
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("category", e.getKey());
-                    item.put("share", Math.round(e.getValue() * 100.0 / drugTotal));
-                    return item;
-                })
-                .toList();
+                refillRequestRepository.save(req);
+                return new ApiResponse(true, "Refill processed successfully", req.getStatus());
+        }
 
-        Map<String, Object> aiMetrics = new LinkedHashMap<>();
-        aiMetrics.put("transcriptionAccuracy", null);
-        aiMetrics.put("ocrAccuracy", null);
-        aiMetrics.put("doctorDraftAcceptanceRate", null);
-        aiMetrics.put("avgProcessingSeconds", null);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("summary", Map.of(
-                "totalPatients",
-                consultations.stream().map(Consultation::getPatientId).filter(Objects::nonNull).distinct().count(),
-                "consultationsCompleted", completed,
-                "prescriptionsIssued", prescriptions.size(),
-                "aiAdoptionRate",
-                consultations.isEmpty() ? 0 : Math.round(aiAssisted * 1000.0 / consultations.size()) / 10.0,
-                "avgConsultTimeMinutes", 0,
-                "allergyAlertsAvoided", allergyAlerts));
-        result.put("monthlyTrends", monthlyTrends);
-        result.put("topConditions", topConditions);
-        result.put("prescribedDrugClasses", prescribedDrugClasses);
-        result.put("aiQualityMetrics", aiMetrics);
-        return result;
-    }
+        public Map<String, Object> getReports(String timeframe) {
+                Doctor doctor = currentUserService.getCurrentDoctor();
+                LocalDate endDate = LocalDate.now();
+                LocalDate startDate = endDate.minusDays(reportPeriodDays(timeframe) - 1L);
+                List<Consultation> consultations = consultationRepository.findByDoctorId(doctor.getId()).stream()
+                                .filter(c -> isWithinPeriod(c.getDate(), startDate, endDate)).toList();
+                List<Prescription> prescriptions = prescriptionRepository.findByDoctorId(doctor.getId()).stream()
+                                .filter(p -> isWithinPeriod(p.getDate(), startDate, endDate)).toList();
 
-    private String classifyMedication(String name) {
-        String lower = name.toLowerCase(Locale.ROOT);
-        if (lower.contains("amlodipine") || lower.contains("lisinopril") || lower.contains("losartan"))
-            return "Antihypertensive";
-        if (lower.contains("metformin") || lower.contains("insulin"))
-            return "Antidiabetic";
-        if (lower.contains("salbutamol") || lower.contains("albuterol") || lower.contains("budesonide")
-                || lower.contains("inhaler"))
-            return "Respiratory";
-        if (lower.contains("amoxicillin") || lower.contains("azithromycin") || lower.contains("antibiotic"))
-            return "Antibiotic";
-        if (lower.contains("paracetamol") || lower.contains("ibuprofen") || lower.contains("acetaminophen"))
-            return "Analgesic / Antipyretic";
-        return "Other";
-    }
+                long completed = consultations.stream().filter(c -> "Completed".equalsIgnoreCase(c.getStatus()))
+                                .count();
+                long aiAssisted = consultations.stream()
+                                .filter(c -> c.getAiStateJson() != null && !c.getAiStateJson().isBlank()).count();
+                long allergyAlerts = prescriptions.stream()
+                                .filter(p -> p.getNotes() != null
+                                                && p.getNotes().toLowerCase(Locale.ROOT).contains("warning"))
+                                .count();
 
-    private Map<String, Object> defaultSettings() {
-        return new HashMap<>(Map.of(
-                "profile", new HashMap<>(Map.of(
-                        "fullName", "Doctor", "specialization", "", "qualifications", "", "licenseNumber", "",
-                        "hospitalAffiliation", "", "department", "", "phone", "", "email", "", "experienceYears", 0,
-                        "consultationFee", 0)),
-                "preferences", new HashMap<>(Map.of(
-                        "defaultFollowUpDays", 14, "autoStartRecording", true, "strictAllergyChecks", true,
-                        "suggestGenericEquivalents", true, "aiModelEngine", "Configured by environment",
-                        "autoExportPDF", false,
-                        "defaultRxNotes", "Take medications strictly as instructed and report adverse reactions.")),
-                "notifications", new HashMap<>(Map.of(
-                        "emailAlerts", true, "patientMessagePush", true, "criticalLabAlerts", true,
-                        "weeklyReportDigest", true))));
-    }
+                Map<YearMonth, Long> monthlyConsultations = new LinkedHashMap<>();
+                Map<YearMonth, Long> monthlyPrescriptions = new LinkedHashMap<>();
+                Map<YearMonth, Long> monthlyAi = new LinkedHashMap<>();
+                YearMonth current = YearMonth.now();
+                for (int i = 5; i >= 0; i--)
+                        monthlyConsultations.put(current.minusMonths(i), 0L);
+                monthlyPrescriptions.putAll(monthlyConsultations);
+                monthlyAi.putAll(monthlyConsultations);
 
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> getSettings() {
-        Doctor doctor = currentUserService.getCurrentDoctor();
-        Map<String, Object> settings = userSettingsService.getOrCreate(currentUserService.getUser().getId(), "doctor",
-                defaultSettings());
-        Map<String, Object> profile = new HashMap<>(
-                (Map<String, Object>) settings.getOrDefault("profile", new HashMap<>()));
-        profile.put("fullName", doctor.getName());
-        profile.put("email", doctor.getEmail());
-        if (doctor.getSpecialization() != null)
-            profile.put("specialization", doctor.getSpecialization());
-        if (doctor.getLicenseNumber() != null)
-            profile.put("licenseNumber", doctor.getLicenseNumber());
-        if (doctor.getHospital() != null)
-            profile.put("hospitalAffiliation", doctor.getHospital());
-        if (doctor.getPhone() != null)
-            profile.put("phone", doctor.getPhone());
-        settings.put("profile", profile);
-        return settings;
-    }
+                for (Consultation c : consultations) {
+                        try {
+                                YearMonth ym = YearMonth.parse(c.getDate().substring(0, 7));
+                                monthlyConsultations.computeIfPresent(ym, (k, v) -> v + 1);
+                                if (c.getAiStateJson() != null && !c.getAiStateJson().isBlank())
+                                        monthlyAi.computeIfPresent(ym, (k, v) -> v + 1);
+                        } catch (Exception ignored) {
+                        }
+                }
+                for (Prescription rx : prescriptions) {
+                        try {
+                                YearMonth ym = YearMonth.parse(rx.getDate().substring(0, 7));
+                                monthlyPrescriptions.computeIfPresent(ym, (k, v) -> v + 1);
+                        } catch (Exception ignored) {
+                        }
+                }
 
-    public Map<String, Object> updateSettings(Map<String, Object> newSettings) {
-        Doctor doctor = currentUserService.getCurrentDoctor();
-        return userSettingsService.replace(currentUserService.getUser().getId(), "doctor", newSettings,
-                defaultSettings());
-    }
+                List<Map<String, Object>> monthlyTrends = monthlyConsultations.keySet().stream().map(ym -> {
+                        Map<String, Object> item = new LinkedHashMap<>();
+                        item.put("month", ym.format(DateTimeFormatter.ofPattern("MMM")));
+                        item.put("consultations", monthlyConsultations.get(ym));
+                        item.put("prescriptions", monthlyPrescriptions.get(ym));
+                        item.put("aiDrafts", monthlyAi.get(ym));
+                        return item;
+                }).toList();
+
+                Map<String, Long> conditions = new HashMap<>();
+                prescriptions.stream().map(Prescription::getDiagnosis).filter(Objects::nonNull)
+                                .filter(v -> !v.isBlank())
+                                .forEach(d -> conditions.merge(d, 1L, Long::sum));
+                long conditionTotal = Math.max(1, conditions.values().stream().mapToLong(Long::longValue).sum());
+                List<Map<String, Object>> topConditions = conditions.entrySet().stream()
+                                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()).limit(5)
+                                .map(e -> {
+                                        Map<String, Object> item = new LinkedHashMap<>();
+                                        item.put("label", e.getKey());
+                                        item.put("count", e.getValue());
+                                        item.put("percentage", Math.round(e.getValue() * 100.0 / conditionTotal));
+                                        return item;
+                                })
+                                .toList();
+
+                Map<String, Long> classes = new HashMap<>();
+                prescriptions.stream()
+                                .flatMap(p -> p.getItems() == null ? java.util.stream.Stream.empty()
+                                                : p.getItems().stream())
+                                .map(PrescriptionItem::getName).filter(Objects::nonNull)
+                                .forEach(name -> classes.merge(classifyMedication(name), 1L, Long::sum));
+                long drugTotal = Math.max(1, classes.values().stream().mapToLong(Long::longValue).sum());
+                List<Map<String, Object>> prescribedDrugClasses = classes.entrySet().stream()
+                                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()).limit(5)
+                                .map(e -> {
+                                        Map<String, Object> item = new LinkedHashMap<>();
+                                        item.put("category", e.getKey());
+                                        item.put("share", Math.round(e.getValue() * 100.0 / drugTotal));
+                                        return item;
+                                })
+                                .toList();
+
+                Map<String, Object> aiMetrics = new LinkedHashMap<>();
+                aiMetrics.put("transcriptionAccuracy", null);
+                aiMetrics.put("ocrAccuracy", null);
+                aiMetrics.put("doctorDraftAcceptanceRate", null);
+                aiMetrics.put("avgProcessingSeconds", null);
+                Map<String, Object> result = new LinkedHashMap<>();
+                Map<String, Object> summary = new LinkedHashMap<>();
+                summary.put("totalPatients",
+                                consultations.stream().map(Consultation::getPatientId).filter(Objects::nonNull)
+                                                .distinct().count());
+                summary.put("consultationsCompleted", completed);
+                summary.put("prescriptionsIssued", prescriptions.size());
+                summary.put("aiAdoptionRate",
+                                consultations.isEmpty() ? 0
+                                                : Math.round(aiAssisted * 1000.0 / consultations.size()) / 10.0);
+                summary.put("avgConsultTimeMinutes", null);
+                summary.put("allergyAlertsAvoided", allergyAlerts);
+                result.put("summary", summary);
+                result.put("timeframe", timeframe);
+                result.put("monthlyTrends", monthlyTrends);
+                result.put("topConditions", topConditions);
+                result.put("prescribedDrugClasses", prescribedDrugClasses);
+                result.put("aiQualityMetrics", aiMetrics);
+                return result;
+        }
+
+        private int reportPeriodDays(String timeframe) {
+                return switch (timeframe == null ? "30d" : timeframe) {
+                        case "7d" -> 7;
+                        case "90d" -> 90;
+                        case "1y" -> 365;
+                        default -> 30;
+                };
+        }
+
+        private boolean isWithinPeriod(String value, LocalDate start, LocalDate end) {
+                if (value == null || value.isBlank())
+                        return false;
+                try {
+                        LocalDate date = LocalDate.parse(value.length() >= 10 ? value.substring(0, 10) : value);
+                        return !date.isBefore(start) && !date.isAfter(end);
+                } catch (java.time.format.DateTimeParseException ex) {
+                        return false;
+                }
+        }
+
+        private String classifyMedication(String name) {
+                String lower = name.toLowerCase(Locale.ROOT);
+                if (lower.contains("amlodipine") || lower.contains("lisinopril") || lower.contains("losartan"))
+                        return "Antihypertensive";
+                if (lower.contains("metformin") || lower.contains("insulin"))
+                        return "Antidiabetic";
+                if (lower.contains("salbutamol") || lower.contains("albuterol") || lower.contains("budesonide")
+                                || lower.contains("inhaler"))
+                        return "Respiratory";
+                if (lower.contains("amoxicillin") || lower.contains("azithromycin") || lower.contains("antibiotic"))
+                        return "Antibiotic";
+                if (lower.contains("paracetamol") || lower.contains("ibuprofen") || lower.contains("acetaminophen"))
+                        return "Analgesic / Antipyretic";
+                return "Other";
+        }
+
+        private Map<String, Object> defaultSettings() {
+                return new HashMap<>(Map.of(
+                                "profile", new HashMap<>(Map.of(
+                                                "fullName", "Doctor", "specialization", "", "qualifications", "",
+                                                "licenseNumber", "",
+                                                "hospitalAffiliation", "", "department", "", "phone", "", "email", "",
+                                                "experienceYears", 0,
+                                                "consultationFee", 0)),
+                                "preferences", new HashMap<>(Map.of(
+                                                "defaultFollowUpDays", 14, "autoStartRecording", true,
+                                                "strictAllergyChecks", true,
+                                                "suggestGenericEquivalents", true, "aiModelEngine",
+                                                "Configured by environment",
+                                                "autoExportPDF", false,
+                                                "defaultRxNotes",
+                                                "Take medications strictly as instructed and report adverse reactions.")),
+                                "notifications", new HashMap<>(Map.of(
+                                                "emailAlerts", true, "patientMessagePush", true, "criticalLabAlerts",
+                                                true,
+                                                "weeklyReportDigest", true))));
+        }
+
+        @SuppressWarnings("unchecked")
+        public Map<String, Object> getSettings() {
+                Doctor doctor = currentUserService.getCurrentDoctor();
+                Map<String, Object> settings = userSettingsService.getOrCreate(currentUserService.getUser().getId(),
+                                "doctor",
+                                defaultSettings());
+                Map<String, Object> profile = new HashMap<>(
+                                (Map<String, Object>) settings.getOrDefault("profile", new HashMap<>()));
+                profile.put("fullName", doctor.getName());
+                profile.put("email", doctor.getEmail());
+                if (doctor.getSpecialization() != null)
+                        profile.put("specialization", doctor.getSpecialization());
+                if (doctor.getLicenseNumber() != null)
+                        profile.put("licenseNumber", doctor.getLicenseNumber());
+                if (doctor.getHospital() != null)
+                        profile.put("hospitalAffiliation", doctor.getHospital());
+                if (doctor.getPhone() != null)
+                        profile.put("phone", doctor.getPhone());
+                settings.put("profile", profile);
+                return settings;
+        }
+
+        public Map<String, Object> updateSettings(Map<String, Object> newSettings) {
+                Doctor doctor = currentUserService.getCurrentDoctor();
+                return userSettingsService.replace(currentUserService.getUser().getId(), "doctor", newSettings,
+                                defaultSettings());
+        }
 }

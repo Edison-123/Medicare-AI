@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Activity, Search, Download, Trash2, RefreshCw, AlertTriangle,
   ShieldCheck, Server, Filter
@@ -9,21 +9,23 @@ import {
   Card, PageHeader, LoadingState, ErrorState, EmptyState
 } from '../../components/common/ui'
 
-const COMPONENTS = [
-  'All', 'RxEngine', 'AiSafetyFilter', 'AuthService',
-  'TranscriptionService', 'RateLimiter', 'DbCluster', 'BackupEngine', 'LabConnector'
-]
-
 export default function AdminSystemLogs() {
   const [level, setLevel] = useState('All')
   const [component, setComponent] = useState('All')
   const [search, setSearch] = useState('')
+  const [componentOptions, setComponentOptions] = useState([])
   const debouncedSearch = useDebounced(search, 200)
 
   const { data: logs, loading, error, reload } = useAsync(
     () => adminApi.getSystemLogs({ level, component, q: debouncedSearch }),
     [level, component, debouncedSearch]
   )
+
+  useEffect(() => {
+    if (component === 'All' && logs) {
+      setComponentOptions([...new Set(logs.map(log => log.component).filter(Boolean))].sort())
+    }
+  }, [component, logs])
 
   const [clearing, setClearing] = useState(false)
 
@@ -81,7 +83,7 @@ export default function AdminSystemLogs() {
 
           <label className="field" style={{ minWidth: 170 }}>
             <select value={component} onChange={e => setComponent(e.target.value)}>
-              {COMPONENTS.map(c => (
+              {['All', ...componentOptions].map(c => (
                 <option key={c} value={c}>Component: {c}</option>
               ))}
             </select>

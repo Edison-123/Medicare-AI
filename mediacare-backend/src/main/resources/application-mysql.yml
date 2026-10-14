@@ -3,9 +3,9 @@ spring:
     activate:
       on-profile: mysql
   datasource:
-    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/medicare_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/medicare_db?createDatabaseIfNotExist=true&sslMode=REQUIRED&serverTimezone=UTC}
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${MYSQL_USERNAME:root}
+    username: ${MYSQL_USERNAME}
     password: ${MYSQL_PASSWORD}
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect

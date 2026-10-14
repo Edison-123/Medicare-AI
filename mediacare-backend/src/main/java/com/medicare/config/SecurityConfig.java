@@ -27,32 +27,35 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final CookieCsrfFilter cookieCsrfFilter;
     private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, ObjectMapper objectMapper) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, CookieCsrfFilter cookieCsrfFilter,
+            ObjectMapper objectMapper) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.cookieCsrfFilter = cookieCsrfFilter;
         this.objectMapper = objectMapper;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf.disable()) // Stateless JWT API; CSRF is not used for bearer-token authentication.
-            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(authenticationEntryPoint())
-                .accessDeniedHandler(accessDeniedHandler()))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/auth/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/v3/api-docs/**"
-                ).permitAll()
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable()) // Stateless JWT API; CSRF is not used for bearer-token authentication.
+                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint())
+                        .accessDeniedHandler(accessDeniedHandler()))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/auth/login",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**")
+                        .permitAll()
+                        .anyRequest().authenticated())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(cookieCsrfFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
@@ -63,8 +66,7 @@ public class SecurityConfig {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             response.setContentType("application/json");
             response.getWriter().write(objectMapper.writeValueAsString(
-                    Map.of("status", 401, "message", "Authentication required")
-            ));
+                    Map.of("status", 401, "message", "Authentication required")));
         };
     }
 
@@ -74,8 +76,7 @@ public class SecurityConfig {
             response.setStatus(HttpStatus.FORBIDDEN.value());
             response.setContentType("application/json");
             response.getWriter().write(objectMapper.writeValueAsString(
-                    Map.of("status", 403, "message", "You do not have access to this resource")
-            ));
+                    Map.of("status", 403, "message", "You do not have access to this resource")));
         };
     }
 

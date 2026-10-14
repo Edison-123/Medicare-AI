@@ -1,56 +1,55 @@
-import { useState } from 'react'
-import {
-  Settings, Bell, Shield, Lock, Smartphone, CheckCircle2,
-  Save, KeyRound, Eye, EyeOff
-} from 'lucide-react'
-import {
-  Card, PageHeader
-} from '../../components/common/ui'
+import { useEffect, useState } from 'react'
+import { CheckCircle2, Save } from 'lucide-react'
+import { patientApi } from '../../services/api'
+import { useAsync } from '../../hooks'
+import { Card, PageHeader, LoadingState, ErrorState } from '../../components/common/ui'
 
 export default function PatientSettings() {
-  const [notifications, setNotifications] = useState({
-    smsAppointments: true,
-    pushReminders: true,
-    emailPrescriptions: true,
-    labAlerts: true,
-    vitalsThresholdAlerts: true
-  })
-
-  const [privacy, setPrivacy] = useState({
-    shareWithSpecialists: true,
-    allowAiAssistance: true,
-    emergencyAccess: true
-  })
-
-  const [security, setSecurity] = useState({
-    twoFactor: true,
-    biometricLogin: false
-  })
-
-  const [pwd, setPwd] = useState({ current: '', newPwd: '', confirm: '' })
-  const [pwdMsg, setPwdMsg] = useState('')
+  const { data, loading, error, reload } = useAsync(patientApi.getSettings)
+  const [notifications, setNotifications] = useState(null)
+  const [privacy, setPrivacy] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [savedSuccess, setSavedSuccess] = useState(false)
 
-  const handleSavePreferences = (e) => {
+  useEffect(() => {
+    if (!data) return
+    setNotifications({
+      smsAppointments: true,
+      pushReminders: true,
+      emailPrescriptions: true,
+      labAlerts: true,
+      vitalsThresholdAlerts: true,
+      ...data.notifications
+    })
+    setPrivacy({
+      shareWithSpecialists: true,
+      allowAiAssistance: true,
+      emergencyAccess: false,
+      ...data.privacy
+    })
+  }, [data])
+
+  const handleSavePreferences = async (e) => {
     e.preventDefault()
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 2500)
+    setSaving(true)
+    setSaveError('')
+    setSavedSuccess(false)
+    try {
+      const saved = await patientApi.updateSettings({ notifications, privacy })
+      setNotifications(saved.notifications || notifications)
+      setPrivacy(saved.privacy || privacy)
+      setSavedSuccess(true)
+    } catch (err) {
+      setSaveError(err.message || 'Unable to save preferences.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleChangePassword = (e) => {
-    e.preventDefault()
-    if (pwd.newPwd !== pwd.confirm) {
-      setPwdMsg('New passwords do not match.')
-      return
-    }
-    if (pwd.newPwd.length < 6) {
-      setPwdMsg('Password must be at least 6 characters.')
-      return
-    }
-    setPwdMsg('Password changed successfully.')
-    setPwd({ current: '', newPwd: '', confirm: '' })
-    setTimeout(() => setPwdMsg(''), 3000)
-  }
+  if (loading) return <LoadingState label="Loading account preferences…" />
+  if (error) return <ErrorState message={error} onRetry={reload} />
+  if (!notifications || !privacy) return null
 
   return (
     <>
@@ -58,7 +57,7 @@ export default function PatientSettings() {
         title="Account & Privacy Settings"
         subtitle="Configure health notification channels, patient data sharing consents, and security parameters."
         actions={
-          <button className="btn btn-primary" onClick={handleSavePreferences}>
+          <button className="btn btn-primary" onClick={handleSavePreferences} disabled={saving}>
             <Save size={15} /> Save All Preferences
           </button>
         }
@@ -70,10 +69,12 @@ export default function PatientSettings() {
           Preferences saved successfully!
         </div>
       )}
+      {saveError && <div className="alert err" role="alert">{saveError}</div>}
 
       <div className="grid-2">
         {/* Notifications Card */}
         <Card title="Health Notifications & Reminders">
+          <p className="muted small">Preferences are saved to your account. Notification delivery depends on configured services.</p>
           <div className="stack">
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}>
               <div>
@@ -111,6 +112,18 @@ export default function PatientSettings() {
               />
             </label>
 
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}>
+              <div>
+                <strong>Lab Result Alerts</strong>
+                <div className="muted small">Preference for notifications when lab results are available</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={notifications.labAlerts}
+                onChange={e => setNotifications({ ...notifications, labAlerts: e.target.checked })}
+              />
+            </label>
+
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', cursor: 'pointer' }}>
               <div>
                 <strong>Abnormal Vitals & Lab Alerts</strong>
@@ -127,6 +140,7 @@ export default function PatientSettings() {
 
         {/* Privacy & Sharing Card */}
         <Card title="Privacy & Health Data Consents">
+          <p className="muted small">These saved preferences do not override access controls or sharing policies enforced elsewhere.</p>
           <div className="stack">
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}>
               <div>
@@ -155,7 +169,7 @@ export default function PatientSettings() {
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', cursor: 'pointer' }}>
               <div>
                 <strong>Emergency Contact Record Access</strong>
-                <div className="muted small">Allow Mary Doe (Spouse) access to vital medical records in acute emergencies</div>
+                <div className="muted small">Allow emergency access to your health record when applicable</div>
               </div>
               <input
                 type="checkbox"
@@ -166,86 +180,10 @@ export default function PatientSettings() {
           </div>
         </Card>
 
-        {/* Account Security Card */}
-        <Card title="Two-Factor Security">
-          <div className="stack">
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--line)', cursor: 'pointer' }}>
-              <div>
-                <strong>Two-Factor Authentication (2FA)</strong>
-                <div className="muted small">Require verification code via SMS when signing in on unrecognized devices</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={security.twoFactor}
-                onChange={e => setSecurity({ ...security, twoFactor: e.target.checked })}
-              />
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', cursor: 'pointer' }}>
-              <div>
-                <strong>Biometric / TouchID Unlock</strong>
-                <div className="muted small">Allow fast biometric login on supported mobile and tablet browsers</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={security.biometricLogin}
-                onChange={e => setSecurity({ ...security, biometricLogin: e.target.checked })}
-              />
-            </label>
-          </div>
+        <Card title="Account Security">
+          <p className="muted">Two-factor authentication, biometric sign-in, and password changes are not available in this portal.</p>
         </Card>
 
-        {/* Change Password Card */}
-        <Card title="Update Account Password">
-          <form onSubmit={handleChangePassword} className="stack">
-            {pwdMsg && (
-              <div className={`alert ${pwdMsg.includes('success') ? 'ok' : 'err'}`}>
-                {pwdMsg}
-              </div>
-            )}
-
-            <label className="field">
-              Current Password
-              <input
-                type="password"
-                required
-                value={pwd.current}
-                onChange={e => setPwd({ ...pwd, current: e.target.value })}
-                placeholder="••••••••"
-              />
-            </label>
-
-            <div className="grid-2">
-              <label className="field">
-                New Password
-                <input
-                  type="password"
-                  required
-                  value={pwd.newPwd}
-                  onChange={e => setPwd({ ...pwd, newPwd: e.target.value })}
-                  placeholder="At least 6 characters"
-                />
-              </label>
-
-              <label className="field">
-                Confirm New Password
-                <input
-                  type="password"
-                  required
-                  value={pwd.confirm}
-                  onChange={e => setPwd({ ...pwd, confirm: e.target.value })}
-                  placeholder="Repeat new password"
-                />
-              </label>
-            </div>
-
-            <div className="row end">
-              <button type="submit" className="btn btn-primary">
-                Update Password
-              </button>
-            </div>
-          </form>
-        </Card>
       </div>
     </>
   )

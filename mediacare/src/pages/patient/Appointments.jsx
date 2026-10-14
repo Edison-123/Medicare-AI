@@ -11,12 +11,17 @@ import {
   Modal, ConfirmationDialog
 } from '../../components/common/ui'
 
-const MOCK_DOCTORS = []
-
 const TIME_SLOTS = [
   '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM',
   '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'
 ]
+
+const isUpcomingAppointment = appointment => {
+  const status = (appointment.status || '').toLowerCase()
+  return (appointment.date || '') >= new Date().toISOString().slice(0, 10)
+    && status !== 'completed'
+    && status !== 'cancelled'
+}
 
 export default function PatientAppointments() {
   const toast = useToast()
@@ -31,13 +36,16 @@ export default function PatientAppointments() {
     doctor: '',
     specialty: '',
     hospital: '',
-    date: '2026-10-18',
-    time: '10:00 AM',
+    date: '',
+    time: '',
     type: 'In-person OPD',
-    room: 'Room 304, Building A',
-    reason: 'Routine blood pressure follow-up'
+    room: '',
+    reason: ''
   })
   const [booking, setBooking] = useState(false)
+  const [bookingError, setBookingError] = useState('')
+  const today = new Date()
+  const minAppointmentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
   // Cancel dialog state
   const [cancelTarget, setCancelTarget] = useState(null)
@@ -50,7 +58,7 @@ export default function PatientAppointments() {
   }, [doctors])
 
   const handleDoctorChange = (doctorId) => {
-    const d = (doctors || MOCK_DOCTORS).find(x => String(x.id) === String(doctorId))
+    const d = (doctors || []).find(x => String(x.id) === String(doctorId))
     if (d) {
       setBookingForm(prev => ({
         ...prev,
@@ -65,6 +73,7 @@ export default function PatientAppointments() {
   const handleBookSubmit = async (e) => {
     e.preventDefault()
     setBooking(true)
+    setBookingError('')
     try {
       await patientApi.bookAppointment({
         ...bookingForm,
@@ -73,6 +82,8 @@ export default function PatientAppointments() {
       toast.success(`Clinic appointment booked with ${bookingForm.doctor} for ${bookingForm.date}`)
       setShowBookModal(false)
       reload()
+    } catch (error) {
+      setBookingError(error.message || 'We could not book this appointment. Please check the date and time.')
     } finally {
       setBooking(false)
     }
@@ -92,8 +103,8 @@ export default function PatientAppointments() {
   }
 
   const filtered = (appointments || []).filter(a => {
-    if (activeTab === 'upcoming') return a.status === 'Scheduled'
-    if (activeTab === 'past') return a.status === 'Completed' || a.status === 'Cancelled'
+    if (activeTab === 'upcoming') return isUpcomingAppointment(a)
+    if (activeTab === 'past') return !isUpcomingAppointment(a)
     return true
   })
 
@@ -111,7 +122,7 @@ export default function PatientAppointments() {
 
       <div className="tabs">
         <button className={activeTab === 'upcoming' ? 'on' : ''} onClick={() => setActiveTab('upcoming')}>
-          Scheduled ({appointments?.filter(a => a.status === 'Scheduled').length || 0})
+          Upcoming ({appointments?.filter(isUpcomingAppointment).length || 0})
         </button>
         <button className={activeTab === 'past' ? 'on' : ''} onClick={() => setActiveTab('past')}>
           Past Visits ({appointments?.filter(a => a.status !== 'Scheduled').length || 0})
@@ -158,7 +169,7 @@ export default function PatientAppointments() {
               </div>
 
               <div className="row">
-                {appt.status === 'Scheduled' && (
+                {appt.status === 'Scheduled' && appt.source !== 'consultation' && (
                   <>
                     <button
                       className="btn btn-sm"
@@ -206,6 +217,7 @@ export default function PatientAppointments() {
           onClose={() => setShowBookModal(false)}
         >
           <form onSubmit={handleBookSubmit}>
+            {bookingError && <div className="alert err" role="alert">{bookingError}</div>}
             {doctorsError && <ErrorState message={doctorsError} onRetry={reloadDoctors} />}
             <label className="field" style={{ marginBottom: 12 }}>
               Consulting Physician & Specialty
@@ -214,7 +226,7 @@ export default function PatientAppointments() {
                 onChange={e => handleDoctorChange(e.target.value)}
                 disabled={doctorsLoading || !doctors?.length}
               >
-                {(doctors || MOCK_DOCTORS).map(d => (
+                {(doctors || []).map(d => (
                   <option key={d.id} value={d.id}>
                     {d.name} — {d.specialty} ({d.hospital})
                   </option>
@@ -240,8 +252,12 @@ export default function PatientAppointments() {
                 <input
                   type="date"
                   required
+                  min={minAppointmentDate}
                   value={bookingForm.date}
-                  onChange={e => setBookingForm({ ...bookingForm, date: e.target.value })}
+                  onChange={e => {
+                    setBookingError('')
+                    setBookingForm({ ...bookingForm, date: e.target.value })
+                  }}
                 />
               </label>
             </div>
@@ -250,7 +266,10 @@ export default function PatientAppointments() {
               Select Time Slot
               <select
                 value={bookingForm.time}
-                onChange={e => setBookingForm({ ...bookingForm, time: e.target.value })}
+                onChange={e => {
+                  setBookingError('')
+                  setBookingForm({ ...bookingForm, time: e.target.value })
+                }}
               >
                 {TIME_SLOTS.map(t => (
                   <option key={t} value={t}>{t}</option>

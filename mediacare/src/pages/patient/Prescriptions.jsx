@@ -6,12 +6,14 @@ import {
 import { patientApi } from '../../services/api'
 import { useAsync, useDebounced } from '../../hooks'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 import {
   Card, PageHeader, StatusBadge, LoadingState, ErrorState,
   EmptyState, Modal, ConfirmationDialog
 } from '../../components/common/ui'
 
 export default function PatientPrescriptions() {
+  const { user } = useAuth()
   const toast = useToast()
   const [tab, setTab] = useState('All')
   const [search, setSearch] = useState('')
@@ -209,8 +211,7 @@ export default function PatientPrescriptions() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>
               <div>
                 <div className="muted small">PATIENT</div>
-                <strong>John Doe</strong> (Male, 42y)
-                <div className="muted">ID: MC-PAT-884910</div>
+                <strong>{viewRx.patient || user?.name || 'Patient'}</strong>
               </div>
               <div>
                 <div className="muted small">PRESCRIBING PHYSICIAN</div>

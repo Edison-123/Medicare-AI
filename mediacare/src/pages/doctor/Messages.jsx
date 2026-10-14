@@ -5,20 +5,17 @@ import { messagesApi } from '../../services/api'
 import { useAsync } from '../../hooks'
 import { Avatar, Card, PageHeader, LoadingState, ErrorState, EmptyState } from '../../components/common/ui'
 
-const QUICK_TEMPLATES = [
-  'Please continue taking your medications as prescribed and monitor symptoms.',
-  'Your latest lab results look clear with no critical abnormalities.',
-  'If you experience shortness of breath or dizziness, please report immediately.',
-  'Please schedule an in-person follow-up visit for next week.'
-]
-
 export default function Messages() {
   const { data: threads, loading, error, reload } = useAsync(messagesApi.listThreads)
-  const [selectedId, setSelectedId] = useState(102) // default to Sarah Wilson (who has unread messages)
+  const [selectedId, setSelectedId] = useState(null)
   const [q, setQ] = useState('')
   const [inputText, setInputText] = useState('')
   const [sending, setSending] = useState(false)
   const scrollRef = useRef(null)
+
+  useEffect(() => {
+    if (selectedId === null && threads?.length) setSelectedId(threads[0].patientId)
+  }, [threads, selectedId])
 
   const activeThread = threads?.find(t => t.patientId === selectedId)
 
@@ -221,22 +218,6 @@ export default function Messages() {
                       </div>
                     )
                   })}
-                </div>
-
-                {/* Quick Templates */}
-                <div style={{ padding: '8px 16px', background: '#fff', borderTop: '1px solid var(--line)', display: 'flex', gap: 6, overflowX: 'auto' }}>
-                  <span className="muted small" style={{ whiteSpace: 'nowrap', alignSelf: 'center', fontSize: '0.75rem' }}>Quick:</span>
-                  {QUICK_TEMPLATES.map((tmpl, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      className="btn btn-sm"
-                      style={{ fontSize: '0.75rem', whiteSpace: 'nowrap', padding: '4px 8px' }}
-                      onClick={() => setInputText(tmpl)}
-                    >
-                      {tmpl.slice(0, 32)}…
-                    </button>
-                  ))}
                 </div>
 
                 {/* Send Input Bar */}

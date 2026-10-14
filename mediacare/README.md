@@ -1,5 +1,10 @@
-# MediCare AI — frontend (Phase 1–3 + Doctor dashboard & Patients)
-npm install && npm run dev   # mock mode by default (see .env.example)
-Logins (any password): doctor@medicare.ai · patient@medicare.ai · admin@medicare.ai
-Swap to the Spring Boot API: set VITE_USE_MOCK=false (Vite proxies /api -> localhost:8080).
-All data access goes through src/services/api; mock data lives only in src/mockData.
+# MediCare AI
+
+The frontend uses the Spring Boot API for authentication and application data. Vite proxies `/api` to `http://localhost:8080`.
+
+```powershell
+npm install
+npm run dev
+```
+
+Copy `.env.example` to `.env` if you need to change `VITE_API_BASE_URL`. Demo accounts and mock data are not included; users must be provisioned in the backend database.

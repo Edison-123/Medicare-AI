@@ -10,6 +10,13 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { Card, StatCard, StatusBadge, LoadingState, ErrorState, PageHeader, Modal } from '../../components/common/ui'
 
+const isUpcomingAppointment = appointment => {
+  const status = (appointment.status || '').toLowerCase()
+  return (appointment.date || '') >= new Date().toISOString().slice(0, 10)
+    && status !== 'completed'
+    && status !== 'cancelled'
+}
+
 const normalizePatientInstructions = (value) => {
   if (Array.isArray(value)) {
     return value
@@ -93,12 +100,12 @@ export default function PatientDashboard() {
   return (
     <>
       <PageHeader
-        title={`Welcome back, ${user?.name || 'John'} 👋`}
+        title={`Welcome back, ${user?.name || 'Patient'} 👋`}
         subtitle="Here is your personal health summary, daily schedule, and medication alerts."
         actions={
           <div className="row">
             <span className="row" style={{ fontSize: '0.85rem', color: 'var(--muted)', background: '#fff', border: '1px solid var(--line)', padding: '6px 12px', borderRadius: 10 }}>
-              <span className="ping-indicator" /> Primary Care: <strong>Dr. John Smith</strong>
+              <span className="ping-indicator" /> Primary Care: <strong>{data?.profile?.primaryDoctor || 'Care team'}</strong>
             </span>
             <Link to="/patient/appointments" className="btn btn-primary">
               <CalendarDays size={16} /> Book Appointment
@@ -197,11 +204,11 @@ export default function PatientDashboard() {
                 title="Upcoming Appointments"
                 action={<Link to="/patient/appointments" className="link">View All</Link>}
               >
-                {(data.appointments || []).filter(a => a.status === 'Scheduled').length === 0 ? (
+                {(data.appointments || []).filter(isUpcomingAppointment).length === 0 ? (
                   <p className="muted" style={{ padding: '12px 0' }}>No scheduled appointments at this time.</p>
                 ) : (
                   <ul className="list">
-                    {(data.appointments || []).filter(a => a.status === 'Scheduled').map(appt => (
+                    {(data.appointments || []).filter(isUpcomingAppointment).map(appt => (
                       <li key={appt.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
                         <div className="avatar" style={{ width: 42, height: 42 }}>
                           {appt.doctorAvatar}
@@ -377,7 +384,7 @@ export default function PatientDashboard() {
           ) : (
             <form onSubmit={handleLogSubmit}>
               <p style={{ fontSize: '0.88rem', color: 'var(--muted)', marginBottom: 14 }}>
-                Enter your self-measured readings from home monitoring devices. These readings update your health status and are accessible to Dr. John Smith.
+                Enter your self-measured readings from home monitoring devices. These readings update your health status and are accessible to your care team.
               </p>
 
               <div style={{ background: '#f8fafc', padding: 12, borderRadius: 10, border: '1px solid var(--line)', marginBottom: 14 }}>

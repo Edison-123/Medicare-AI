@@ -3,8 +3,6 @@ import { Sparkles, AlertTriangle, ShieldCheck, FileText, HelpCircle, Check, Copy
 import { aiToolsApi } from '../../services/api'
 import { Card, PageHeader, LoadingState, ErrorState, AIDraftBanner, StatusBadge } from '../../components/common/ui'
 
-const SAMPLE_NOTE = `Patient 52yo male with history of mild HTN and dyslipidemia presenting with 3-day history of productive cough, low-grade fever (37.9 C), and mild exertional dyspnea. Auscultation reveals bilateral coarse crackles at lung bases. BP 138/86 mmHg, HR 82 bpm, SpO2 96% on room air. Prescribed Amoxicillin/Clavulanate 875/125mg BID x 7 days, encouraged oral fluids, advised isolation until afebrile 24h.`
-
 export default function AITools() {
   const [tab, setTab] = useState('interactions')
 
@@ -53,7 +51,7 @@ export default function AITools() {
 }
 
 function InteractionChecker() {
-  const [drugs, setDrugs] = useState(['Warfarin', 'Aspirin'])
+  const [drugs, setDrugs] = useState([])
   const [inputVal, setInputVal] = useState('')
   const [available, setAvailable] = useState([])
   const [loading, setLoading] = useState(false)
@@ -120,14 +118,6 @@ function InteractionChecker() {
             </datalist>
           </label>
 
-          <div style={{ alignSelf: 'flex-end', marginBottom: 6 }}>
-            <span className="muted small" style={{ display: 'block', marginBottom: 4 }}>Quick test pairs:</span>
-            <div className="row">
-              <button type="button" className="btn btn-sm" onClick={() => { setDrugs(['Warfarin', 'Aspirin']); setResults(null) }}>Warfarin + Aspirin</button>
-              <button type="button" className="btn btn-sm" onClick={() => { setDrugs(['Lisinopril', 'Spironolactone']); setResults(null) }}>Lisinopril + Spironolactone</button>
-              <button type="button" className="btn btn-sm" onClick={() => { setDrugs(['Amlodipine', 'Paracetamol']); setResults(null) }}>Amlodipine + Paracetamol</button>
-            </div>
-          </div>
         </div>
 
         <div className="tags" style={{ marginBottom: 16 }}>
@@ -201,7 +191,7 @@ function InteractionChecker() {
 }
 
 function ClinicalSummarizer() {
-  const [note, setNote] = useState(SAMPLE_NOTE)
+  const [note, setNote] = useState('')
   const [format, setFormat] = useState('soap')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
@@ -229,16 +219,7 @@ function ClinicalSummarizer() {
     <div className="split">
       <Card title="Source Clinical Notes">
         <label className="field">
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <span>Unstructured Clinical Text / Dictation</span>
-            <button
-              type="button"
-              className="link"
-              onClick={() => setNote(SAMPLE_NOTE)}
-            >
-              Reset to sample
-            </button>
-          </div>
+          <span>Unstructured Clinical Text / Dictation</span>
           <textarea
             rows={10}
             value={note}
@@ -318,14 +299,7 @@ function ClinicalSummarizer() {
 
 function GuidelineAssistant() {
   const [query, setQuery] = useState('')
-  const [history, setHistory] = useState([
-    {
-      query: 'What are the first-line pharmacotherapies for uncomplicated hypertension?',
-      answer: 'AHA/ACC Guidelines: First-line agents include thiazide diuretics, CCBs (e.g. Amlodipine), and ACE inhibitors / ARBs. Target BP < 130/80 mmHg in most adult populations.',
-      source: 'MediCare Clinical AI Knowledge Base (Mock)',
-      timestamp: 'Today, 09:15 AM'
-    }
-  ])
+  const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(false)
 
   const ask = async (qText) => {

@@ -12,7 +12,7 @@ import {
   Mic
 } from 'lucide-react'
 import { consultationsApi } from '../../services/api'
-import { speechToText, ocr, llm } from '../../services/ai'
+import { speechToText, ocr, llm, normalizeHandwrittenText } from '../../services/ai'
 import { useAsync } from '../../hooks'
 import { useRecording } from '../../components/ai/useRecording'
 import WritingPad from '../../components/ai/WritingPad'
@@ -152,8 +152,6 @@ function PadStage({ data, onEnd }) {
      * consultation + linked appointment to In Progress.
      */
     consultationsApi.start(data.id)
-
-    rec.start()
   }, [])
 
   useEffect(() => {
@@ -184,17 +182,17 @@ function PadStage({ data, onEnd }) {
     setDialog(null)
 
     const audio = await rec.stop()
+    const strokes = pad.current.getStrokes()
 
     onEnd({
       audio,
 
       inkImage:
-        info.count
+        strokes.length
           ? pad.current.getImage()
           : null,
 
-      strokes:
-        pad.current.getStrokes()
+      strokes
     })
   }
 
@@ -378,6 +376,11 @@ function PadStage({ data, onEnd }) {
             )}
 
             {rec.state ===
+              'idle' && (
+              <>Microphone off</>
+            )}
+
+            {rec.state ===
               'denied' && (
               <>
                 <Mic size={13} />
@@ -387,6 +390,18 @@ function PadStage({ data, onEnd }) {
             )}
 
           </span>
+
+          {rec.state ===
+            'idle' && (
+            <button
+              className="btn btn-primary"
+              onClick={rec.start}
+            >
+              <Mic size={14} />
+
+              Start recording
+            </button>
+          )}
 
           {rec.state ===
             'recording' && (
@@ -498,7 +513,7 @@ function PadStage({ data, onEnd }) {
 const LABELS = {
   stt: 'Speech-to-text (conversation)',
   ocr: 'Handwriting recognition',
-  llm: 'Clinical summary draft'
+  llm: 'Clinical detail extraction'
 }
 
 function Processing({
@@ -516,7 +531,7 @@ function Processing({
         ? 'Queued'
         : 'Skipped',
 
-      llm: 'Queued'
+      llm: 'Ready'
     })
 
   useEffect(() => {
@@ -540,6 +555,9 @@ function Processing({
         handwritten: '',
         stt: 'Idle',
         llm: 'Idle',
+        sttError: '',
+        ocrError: '',
+        llmError: '',
         draft: null,
         inkImage:
           payload.inkImage,
@@ -602,10 +620,13 @@ function Processing({
                   'Completed'
                 )
               },
-              () => {
+              e => {
 
                 ai.stt =
                   'Failed'
+
+                ai.sttError =
+                  e.message || 'Speech-to-text failed. Check the configured Whisper provider and API key.'
 
                 up(
                   'stt',
@@ -632,7 +653,7 @@ function Processing({
               r => {
 
                 ai.handwritten =
-                  r.text
+                  normalizeHandwrittenText(r.text)
 
                 ai.ocrProvider =
                   r.provider
@@ -642,7 +663,10 @@ function Processing({
                   'Completed'
                 )
               },
-              () => {
+              e => {
+                ai.ocrError =
+                  e.message || 'Handwriting recognition failed. Check the configured OCR provider.'
+
                 up(
                   'ocr',
                   'Failed'
@@ -655,68 +679,7 @@ function Processing({
       await Promise.all(
         jobs
       )
-
-      if (
-        ai.transcript ||
-        ai.handwritten
-      ) {
-
-        up(
-          'llm',
-          'Processing'
-        )
-
-        try {
-
-          const r =
-            await llm.summarize({
-              transcript:
-                ai.transcript,
-
-              handwritten:
-                ai.handwritten
-            })
-
-          ai.draft = {
-            fields:
-              r.fields,
-
-            provider:
-              r.provider,
-
-            review:
-              'Pending',
-
-            reviewedBy:
-              null
-          }
-
-          ai.llm =
-            'Completed'
-
-          up(
-            'llm',
-            'Completed'
-          )
-
-        } catch {
-
-          ai.llm =
-            'Failed'
-
-          up(
-            'llm',
-            'Failed'
-          )
-        }
-
-      } else {
-
-        up(
-          'llm',
-          'Skipped'
-        )
-      }
+      up('llm', ai.transcript || ai.handwritten ? 'Ready' : 'Skipped')
 
       setTimeout(
         () =>
@@ -733,11 +696,7 @@ function Processing({
 
       <Card title="Processing consultation">
 
-        <p className="muted">
-          Preparing your draft. Nothing is
-          added to the patient record until
-          you review it.
-        </p>
+        <p className="muted">Preparing the transcript and handwriting. Extracted details will fill the consultation fields after you request extraction.</p>
 
         <ul className="list steps">
 

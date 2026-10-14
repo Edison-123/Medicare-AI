@@ -18,6 +18,7 @@ import {
 import { patientApi } from '../../services/api'
 import { useAsync } from '../../hooks'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 import {
   Card,
   PageHeader,
@@ -69,6 +70,7 @@ const normalizePatientInstructions = (value) => {
 }
 
 export default function PatientVisitSummaries() {
+  const { user } = useAuth()
   const {
     data: summaries,
     loading,
@@ -614,11 +616,7 @@ export default function PatientVisitSummaries() {
                 </strong>
 
                 <div className="muted small">
-                  Patient: John Doe (42y)
-                </div>
-
-                <div className="muted small">
-                  Ref: MC-ENC-88391
+                  Patient: {selectedVisit.patientName || user?.name || 'Patient'}
                 </div>
               </div>
             </div>

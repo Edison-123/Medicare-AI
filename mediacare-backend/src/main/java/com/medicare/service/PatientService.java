@@ -18,10 +18,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
 public class PatientService {
+
+    private static final DateTimeFormatter APPOINTMENT_TIME_FORMATTER = DateTimeFormatter.ofPattern("hh:mm a",
+            Locale.US);
 
     private final PatientRepository patientRepository;
     private final PrescriptionRepository prescriptionRepository;
@@ -38,22 +45,24 @@ public class PatientService {
     private final LabTestRepository labTestRepository;
     private final ClinicalMessageService clinicalMessageService;
     private final ObjectMapper objectMapper;
+    private final UserSettingsService userSettingsService;
 
     public PatientService(PatientRepository patientRepository,
-                          PrescriptionRepository prescriptionRepository,
-                          RefillRequestRepository refillRequestRepository,
-                          VitalLogRepository vitalLogRepository,
-                          ConsultationRepository consultationRepository,
-                          MedicineReminderRepository reminderRepository,
-                          NotificationRepository notificationRepository,
-                          AppointmentRepository appointmentRepository,
-                          CurrentUserService currentUserService,
-                          DoctorRepository doctorRepository,
-                          UserRepository userRepository,
-                          PatientDocumentRepository patientDocumentRepository,
-                          LabTestRepository labTestRepository,
-                          ClinicalMessageService clinicalMessageService,
-                          ObjectMapper objectMapper) {
+            PrescriptionRepository prescriptionRepository,
+            RefillRequestRepository refillRequestRepository,
+            VitalLogRepository vitalLogRepository,
+            ConsultationRepository consultationRepository,
+            MedicineReminderRepository reminderRepository,
+            NotificationRepository notificationRepository,
+            AppointmentRepository appointmentRepository,
+            CurrentUserService currentUserService,
+            DoctorRepository doctorRepository,
+            UserRepository userRepository,
+            PatientDocumentRepository patientDocumentRepository,
+            LabTestRepository labTestRepository,
+            ClinicalMessageService clinicalMessageService,
+            ObjectMapper objectMapper,
+            UserSettingsService userSettingsService) {
         this.patientRepository = patientRepository;
         this.prescriptionRepository = prescriptionRepository;
         this.refillRequestRepository = refillRequestRepository;
@@ -69,6 +78,7 @@ public class PatientService {
         this.labTestRepository = labTestRepository;
         this.clinicalMessageService = clinicalMessageService;
         this.objectMapper = objectMapper;
+        this.userSettingsService = userSettingsService;
     }
 
     public Map<String, Object> getDashboard() {
@@ -141,26 +151,36 @@ public class PatientService {
                 .filter(p -> "Finalized".equalsIgnoreCase(p.getStatus()))
                 .toList());
         data.put("reminders", reminderRepository.findByPatientId(pat.getId()));
-        data.put("appointments", appointmentRepository.findByPatientId(pat.getId()));
+        data.put("appointments", getAppointments(pat));
 
         List<Map<String, Object>> history = logs.stream()
                 .limit(7)
                 .map(l -> {
                     Map<String, Object> h = new LinkedHashMap<>();
                     h.put("date", l.getMeasuredAt());
-                    if (l.getBpSys() != null) h.put("bpSys", l.getBpSys());
-                    if (l.getBpDia() != null) h.put("bpDia", l.getBpDia());
-                    if (l.getHeartRate() != null) h.put("hr", l.getHeartRate());
-                    if (l.getSpo2() != null) h.put("spo2", l.getSpo2());
-                    if (l.getGlucose() != null) h.put("glucose", l.getGlucose());
-                    if (l.getWeightKg() != null) h.put("weight", l.getWeightKg());
+                    if (l.getBpSys() != null)
+                        h.put("bpSys", l.getBpSys());
+                    if (l.getBpDia() != null)
+                        h.put("bpDia", l.getBpDia());
+                    if (l.getHeartRate() != null)
+                        h.put("hr", l.getHeartRate());
+                    if (l.getSpo2() != null)
+                        h.put("spo2", l.getSpo2());
+                    if (l.getGlucose() != null)
+                        h.put("glucose", l.getGlucose());
+                    if (l.getWeightKg() != null)
+                        h.put("weight", l.getWeightKg());
                     return h;
                 })
                 .toList();
         data.put("vitalsHistory", history);
 
-        List<Consultation> visits = consultationRepository.findByPatientId(pat.getId());
-        data.put("recentVisit", visits.isEmpty() ? null : visits.get(0));
+        data.put("recentVisit", consultationRepository.findByPatientId(pat.getId()).stream()
+                .filter(visit -> "Completed".equalsIgnoreCase(visit.getStatus()))
+                .filter(visit -> visit.getKeyTakeaway() != null && !visit.getKeyTakeaway().isBlank())
+                .max(Comparator.comparing(Consultation::getDate,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .orElse(null));
 
         return data;
     }
@@ -179,7 +199,8 @@ public class PatientService {
                 int systolic = Integer.parseInt(req.getBpSys().trim());
 
                 if (req.getBpDia() == null || req.getBpDia().isBlank()) {
-                    throw new ValidationException("Diastolic blood pressure is required when systolic pressure is provided");
+                    throw new ValidationException(
+                            "Diastolic blood pressure is required when systolic pressure is provided");
                 }
 
                 int diastolic = Integer.parseInt(req.getBpDia().trim());
@@ -189,33 +210,41 @@ public class PatientService {
 
                 log.setBpSys(systolic);
                 log.setBpDia(diastolic);
-                if (systolic >= 180 || diastolic >= 110) isCritical = true;
+                if (systolic >= 180 || diastolic >= 110)
+                    isCritical = true;
             }
 
             if (req.getHr() != null && !req.getHr().isBlank()) {
                 int heartRate = Integer.parseInt(req.getHr().trim());
-                if (heartRate <= 0) throw new ValidationException("Heart rate must be greater than zero");
+                if (heartRate <= 0)
+                    throw new ValidationException("Heart rate must be greater than zero");
                 log.setHeartRate(heartRate);
-                if (heartRate >= 150 || heartRate <= 40) isCritical = true;
+                if (heartRate >= 150 || heartRate <= 40)
+                    isCritical = true;
             }
 
             if (req.getSpo2() != null && !req.getSpo2().isBlank()) {
                 int spo2 = Integer.parseInt(req.getSpo2().trim());
-                if (spo2 < 0 || spo2 > 100) throw new ValidationException("SpO2 must be between 0 and 100");
+                if (spo2 < 0 || spo2 > 100)
+                    throw new ValidationException("SpO2 must be between 0 and 100");
                 log.setSpo2(spo2);
-                if (spo2 < 92) isCritical = true;
+                if (spo2 < 92)
+                    isCritical = true;
             }
 
             if (req.getGlucose() != null && !req.getGlucose().isBlank()) {
                 int glucose = Integer.parseInt(req.getGlucose().trim());
-                if (glucose <= 0) throw new ValidationException("Glucose must be greater than zero");
+                if (glucose <= 0)
+                    throw new ValidationException("Glucose must be greater than zero");
                 log.setGlucose(glucose);
-                if (glucose >= 250) isCritical = true;
+                if (glucose >= 250)
+                    isCritical = true;
             }
 
             if (req.getWeightKg() != null && !req.getWeightKg().isBlank()) {
                 double weightKg = Double.parseDouble(req.getWeightKg().trim());
-                if (weightKg <= 0) throw new ValidationException("Weight must be greater than zero");
+                if (weightKg <= 0)
+                    throw new ValidationException("Weight must be greater than zero");
                 log.setWeightKg(weightKg);
             }
         } catch (NumberFormatException e) {
@@ -241,54 +270,66 @@ public class PatientService {
                     "A critical home vital reading was recorded. Please review the patient's latest vitals.",
                     "/doctor/patients/" + patient.getId(),
                     "Just now",
-                    true
-            ));
+                    true));
 
             return new ApiResponse(
                     true,
                     "A critical reading was detected. Please repeat the measurement and seek medical attention if you have concerning symptoms.",
-                    true
-            );
+                    true);
         }
 
         return new ApiResponse(true, "Health reading logged and verified successfully.", false);
     }
 
     private String getBloodPressureStatus(Integer systolic, Integer diastolic) {
-        if (systolic == null || diastolic == null) return "Unavailable";
-        if (systolic >= 140 || diastolic >= 90) return "Elevated";
-        if (systolic >= 130 || diastolic >= 80) return "Stage 1";
+        if (systolic == null || diastolic == null)
+            return "Unavailable";
+        if (systolic >= 140 || diastolic >= 90)
+            return "Elevated";
+        if (systolic >= 130 || diastolic >= 80)
+            return "Stage 1";
         return "Optimal";
     }
 
     private String getBloodPressureTone(Integer systolic, Integer diastolic) {
-        if (systolic == null || diastolic == null) return "green";
-        if (systolic >= 140 || diastolic >= 90) return "orange";
+        if (systolic == null || diastolic == null)
+            return "green";
+        if (systolic >= 140 || diastolic >= 90)
+            return "orange";
         return "green";
     }
 
     private String getHeartRateStatus(Integer heartRate) {
-        if (heartRate == null) return "Unavailable";
-        if (heartRate < 40 || heartRate > 120) return "Abnormal";
+        if (heartRate == null)
+            return "Unavailable";
+        if (heartRate < 40 || heartRate > 120)
+            return "Abnormal";
         return "Resting";
     }
 
     private String getSpo2Status(Integer spo2) {
-        if (spo2 == null) return "Unavailable";
-        if (spo2 < 92) return "Low";
-        if (spo2 < 95) return "Borderline";
+        if (spo2 == null)
+            return "Unavailable";
+        if (spo2 < 92)
+            return "Low";
+        if (spo2 < 95)
+            return "Borderline";
         return "Healthy";
     }
 
     private String getSpo2Tone(Integer spo2) {
-        if (spo2 == null) return "green";
+        if (spo2 == null)
+            return "green";
         return spo2 < 92 ? "orange" : "green";
     }
 
     private String getGlucoseStatus(Integer glucose) {
-        if (glucose == null) return "Unavailable";
-        if (glucose >= 250) return "High";
-        if (glucose >= 126) return "Elevated";
+        if (glucose == null)
+            return "Unavailable";
+        if (glucose >= 250)
+            return "High";
+        if (glucose >= 126)
+            return "Elevated";
         return "Normal";
     }
 
@@ -306,7 +347,9 @@ public class PatientService {
         req.setPrescriptionCode(rx.getCode());
         req.setPatientId(patient.getId());
         req.setPatientName(patient.getName());
-        req.setMedicine(!rx.getItems().isEmpty() ? rx.getItems().get(0).getName() + " " + rx.getItems().get(0).getStrength() : "Medication Refill");
+        req.setMedicine(
+                !rx.getItems().isEmpty() ? rx.getItems().get(0).getName() + " " + rx.getItems().get(0).getStrength()
+                        : "Medication Refill");
         req.setDosage(!rx.getItems().isEmpty() ? rx.getItems().get(0).getDosage() : "1 tablet daily");
 
         List<VitalLog> patientLogs = vitalLogRepository.findByPatientIdOrderByMeasuredAtDesc(patient.getId());
@@ -314,7 +357,9 @@ public class PatientService {
         if (!patientLogs.isEmpty()) {
             VitalLog latestLog = patientLogs.get(0);
             if (latestLog.getBpSys() != null) {
-                vitalsStr = "BP " + latestLog.getBpSys() + "/" + (latestLog.getBpDia() != null ? latestLog.getBpDia() : 80) + " on " + latestLog.getMeasuredAt();
+                vitalsStr = "BP " + latestLog.getBpSys() + "/"
+                        + (latestLog.getBpDia() != null ? latestLog.getBpDia() : 80) + " on "
+                        + latestLog.getMeasuredAt();
             }
         }
         req.setLastVitals(vitalsStr);
@@ -333,8 +378,7 @@ public class PatientService {
                 "Refill requested for " + req.getMedicine() + ".",
                 "/doctor/dashboard",
                 "Just now",
-                true
-        ));
+                true));
 
         return new ApiResponse(true, "Refill request submitted to your primary care team.");
     }
@@ -347,12 +391,12 @@ public class PatientService {
         }
         if (q != null && !q.isBlank()) {
             String queryLower = q.trim().toLowerCase();
-            list = list.stream().filter(p ->
-                    (p.getCode() != null && p.getCode().toLowerCase().contains(queryLower)) ||
+            list = list.stream().filter(p -> (p.getCode() != null && p.getCode().toLowerCase().contains(queryLower)) ||
                     (p.getDoctor() != null && p.getDoctor().toLowerCase().contains(queryLower)) ||
                     (p.getDiagnosis() != null && p.getDiagnosis().toLowerCase().contains(queryLower)) ||
-                    (p.getItems() != null && p.getItems().stream().anyMatch(i -> i.getName() != null && i.getName().toLowerCase().contains(queryLower)))
-            ).toList();
+                    (p.getItems() != null && p.getItems().stream()
+                            .anyMatch(i -> i.getName() != null && i.getName().toLowerCase().contains(queryLower))))
+                    .toList();
         }
         return list;
     }
@@ -406,12 +450,89 @@ public class PatientService {
 
     public List<Appointment> getAppointments() {
         Patient patient = currentUserService.getCurrentPatient();
-        return appointmentRepository.findByPatientId(patient.getId());
+        return getAppointments(patient);
+    }
+
+    private List<Appointment> getAppointments(Patient patient) {
+        List<Appointment> appointments = new ArrayList<>(appointmentRepository.findByPatientId(patient.getId()));
+        Set<Long> appointmentIds = new HashSet<>();
+        appointments.stream().map(Appointment::getId).filter(Objects::nonNull).forEach(appointmentIds::add);
+
+        for (Consultation consultation : consultationRepository.findByPatientId(patient.getId())) {
+            if (consultation.getId() == null || !isUpcomingOpenConsultation(consultation)) {
+                continue;
+            }
+            if (consultation.getAppointmentId() != null && appointmentIds.contains(consultation.getAppointmentId())) {
+                continue;
+            }
+            boolean alreadyRepresented = appointments.stream()
+                    .anyMatch(appointment -> Objects.equals(appointment.getDate(), consultation.getDate())
+                            && Objects.equals(appointment.getTime(), consultation.getTime())
+                            && (consultation.getDoctorId() == null || appointment.getDoctorId() == null
+                                    || Objects.equals(appointment.getDoctorId(), consultation.getDoctorId())));
+            if (alreadyRepresented) {
+                continue;
+            }
+
+            Appointment upcoming = new Appointment();
+            upcoming.setId(-consultation.getId());
+            upcoming.setPatientId(patient.getId());
+            upcoming.setPatient(patient.getName());
+            upcoming.setDoctorId(consultation.getDoctorId());
+            upcoming.setDoctor(consultation.getDoctorName());
+            upcoming.setDate(consultation.getDate());
+            upcoming.setTime(consultation.getTime());
+            upcoming.setType(consultation.getType());
+            upcoming.setStatus(consultation.getStatus());
+            upcoming.setRoom(consultation.getRoom());
+            upcoming.setReason(consultation.getChiefComplaint());
+            upcoming.setSource("consultation");
+
+            if (consultation.getDoctorId() != null) {
+                doctorRepository.findById(consultation.getDoctorId()).ifPresent(doctor -> {
+                    upcoming.setSpecialty(doctor.getSpecialization());
+                    upcoming.setHospital(doctor.getHospital());
+                    String name = doctor.getName() == null ? "DR"
+                            : doctor.getName().replaceFirst("^Dr\\.?\\s*", "").trim();
+                    upcoming.setDoctorAvatar(
+                            name.length() >= 2 ? name.substring(0, 2).toUpperCase() : name.toUpperCase());
+                });
+            }
+            appointments.add(upcoming);
+        }
+
+        return appointments;
+    }
+
+    private boolean isUpcomingOpenConsultation(Consultation consultation) {
+        if ("Completed".equalsIgnoreCase(consultation.getStatus())
+                || "Cancelled".equalsIgnoreCase(consultation.getStatus())) {
+            return false;
+        }
+        try {
+            return !LocalDate.parse(consultation.getDate()).isBefore(LocalDate.now());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     @Transactional
     public Appointment bookAppointment(BookAppointmentRequest req) {
         Patient patient = currentUserService.getCurrentPatient();
+        if ("Inactive".equalsIgnoreCase(patient.getStatus())) {
+            throw new ForbiddenException("Inactive patients cannot book appointments");
+        }
+        LocalDateTime appointmentDateTime;
+        try {
+            appointmentDateTime = LocalDate.parse(req.getDate())
+                    .atTime(LocalTime.parse(req.getTime(), APPOINTMENT_TIME_FORMATTER));
+        } catch (DateTimeParseException | NullPointerException ex) {
+            throw new ValidationException("Please select a valid appointment date and time");
+        }
+        if (!appointmentDateTime.isAfter(LocalDateTime.now())) {
+            throw new ValidationException(
+                    "The selected appointment date and time have already passed. Please choose a future slot.");
+        }
         if (req.getDoctorId() == null) {
             throw new ValidationException("A valid doctor is required for an appointment");
         }
@@ -420,8 +541,10 @@ public class PatientService {
                 .filter(d -> "Active".equalsIgnoreCase(d.getStatus()))
                 .orElseThrow(() -> new NotFoundException("Selected doctor is not available"));
 
-        boolean patientConflict = appointmentRepository.findByPatientIdAndDateAndTime(patient.getId(), req.getDate(), req.getTime()).stream()
-                .anyMatch(a -> !"Cancelled".equalsIgnoreCase(a.getStatus()) && !"Completed".equalsIgnoreCase(a.getStatus()));
+        boolean patientConflict = appointmentRepository
+                .findByPatientIdAndDateAndTime(patient.getId(), req.getDate(), req.getTime()).stream()
+                .anyMatch(a -> !"Cancelled".equalsIgnoreCase(a.getStatus())
+                        && !"Completed".equalsIgnoreCase(a.getStatus()));
         if (patientConflict) {
             throw new ValidationException("You already have an active appointment at this date and time");
         }
@@ -450,7 +573,8 @@ public class PatientService {
         appointment.setStatus("Scheduled");
 
         String cleanName = doctor.getName() == null ? "DR" : doctor.getName().replaceFirst("^Dr\\.?\\s*", "").trim();
-        appointment.setDoctorAvatar(cleanName.length() >= 2 ? cleanName.substring(0, 2).toUpperCase() : cleanName.toUpperCase());
+        appointment.setDoctorAvatar(
+                cleanName.length() >= 2 ? cleanName.substring(0, 2).toUpperCase() : cleanName.toUpperCase());
 
         Appointment savedAppointment = appointmentRepository.save(appointment);
 
@@ -468,7 +592,8 @@ public class PatientService {
         consultation.setChiefComplaint(savedAppointment.getReason());
         consultationRepository.save(consultation);
 
-        // Keep the patient's primary physician synchronized with the actual selected doctor.
+        // Keep the patient's primary physician synchronized with the actual selected
+        // doctor.
         if (patient.getPrimaryDoctor() == null || patient.getPrimaryDoctor().isBlank()) {
             patient.setPrimaryDoctor(doctor.getName());
             patientRepository.save(patient);
@@ -484,29 +609,26 @@ public class PatientService {
 
             if (!Objects.equals(
                     a.getPatientId(),
-                    patient.getId()
-            )) {
+                    patient.getId())) {
                 throw new ForbiddenException(
-                        "You can only cancel your own appointments"
-                );
+                        "You can only cancel your own appointments");
             }
 
             /*
-            * Cancel appointment.
-            */
+             * Cancel appointment.
+             */
             a.setStatus("Cancelled");
             appointmentRepository.save(a);
 
             /*
-            * Cancel the linked consultation too.
-            */
+             * Cancel the linked consultation too.
+             */
             consultationRepository
                     .findByAppointmentId(a.getId())
                     .ifPresent(c -> {
 
                         if (!"Completed".equalsIgnoreCase(
-                                c.getStatus()
-                        )) {
+                                c.getStatus())) {
 
                             c.setStatus("Cancelled");
 
@@ -516,15 +638,12 @@ public class PatientService {
 
             return new ApiResponse(
                     true,
-                    "Appointment cancelled"
-            );
+                    "Appointment cancelled");
 
         }).orElse(
                 new ApiResponse(
                         false,
-                        "Appointment not found"
-                )
-        );
+                        "Appointment not found"));
     }
 
     public Patient getProfile() {
@@ -543,6 +662,33 @@ public class PatientService {
             pat.setAddress(updated.getAddress().trim());
         }
         return patientRepository.save(pat);
+    }
+
+    public Map<String, Object> getSettings() {
+        return userSettingsService.getOrCreate(currentUserService.getUser().getId(), "patient", defaultSettings());
+    }
+
+    public Map<String, Object> updateSettings(Map<String, Object> updated) {
+        return userSettingsService.replace(currentUserService.getUser().getId(), "patient", updated,
+                defaultSettings());
+    }
+
+    private Map<String, Object> defaultSettings() {
+        Map<String, Object> defaults = new LinkedHashMap<>();
+        defaults.put("notifications", new LinkedHashMap<>(Map.of(
+                "smsAppointments", true,
+                "pushReminders", true,
+                "emailPrescriptions", true,
+                "labAlerts", true,
+                "vitalsThresholdAlerts", true)));
+        defaults.put("privacy", new LinkedHashMap<>(Map.of(
+                "shareWithSpecialists", true,
+                "allowAiAssistance", true,
+                "emergencyAccess", true)));
+        defaults.put("security", new LinkedHashMap<>(Map.of(
+                "twoFactor", true,
+                "biometricLogin", false)));
+        return defaults;
     }
 
     public List<Map<String, Object>> getAvailableDoctors() {
@@ -583,24 +729,27 @@ public class PatientService {
         records.put("vaccinations", readJsonList(patient.getVaccinationsJson()));
         records.put("surgeries", readJsonList(patient.getSurgeriesJson()));
         records.put("familyHistory", readJsonList(patient.getFamilyHistoryJson()));
-        records.put("documents", patientDocumentRepository.findByPatientIdOrderByIdDesc(patient.getId()).stream().map(doc -> {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", doc.getId());
-            item.put("name", doc.getName());
-            item.put("category", doc.getCategory());
-            item.put("date", doc.getDate());
-            item.put("size", doc.getSize());
-            item.put("provider", doc.getProvider());
-            return item;
-        }).toList());
+        records.put("documents",
+                patientDocumentRepository.findByPatientIdOrderByIdDesc(patient.getId()).stream().map(doc -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("id", doc.getId());
+                    item.put("name", doc.getName());
+                    item.put("category", doc.getCategory());
+                    item.put("date", doc.getDate());
+                    item.put("size", doc.getSize());
+                    item.put("provider", doc.getProvider());
+                    return item;
+                }).toList());
         return records;
     }
 
     public Map<String, Object> addAllergy(Map<String, Object> body) {
         Patient patient = currentUserService.getCurrentPatient();
         String allergen = String.valueOf(body.getOrDefault("allergen", body.getOrDefault("name", ""))).trim();
-        if (allergen.isBlank()) throw new ValidationException("Allergen is required");
-        if (!patient.getAllergies().contains(allergen)) patient.getAllergies().add(allergen);
+        if (allergen.isBlank())
+            throw new ValidationException("Allergen is required");
+        if (!patient.getAllergies().contains(allergen))
+            patient.getAllergies().add(allergen);
         patientRepository.save(patient);
         Map<String, Object> item = new HashMap<>(body);
         item.put("id", "allergy-" + System.currentTimeMillis());
@@ -612,8 +761,10 @@ public class PatientService {
     public Map<String, Object> addCondition(Map<String, Object> body) {
         Patient patient = currentUserService.getCurrentPatient();
         String condition = String.valueOf(body.getOrDefault("condition", body.getOrDefault("name", ""))).trim();
-        if (condition.isBlank()) throw new ValidationException("Condition is required");
-        if (!patient.getConditions().contains(condition)) patient.getConditions().add(condition);
+        if (condition.isBlank())
+            throw new ValidationException("Condition is required");
+        if (!patient.getConditions().contains(condition))
+            patient.getConditions().add(condition);
         patientRepository.save(patient);
         Map<String, Object> item = new HashMap<>(body);
         item.put("id", "condition-" + System.currentTimeMillis());
@@ -626,7 +777,8 @@ public class PatientService {
     public Map<String, Object> uploadDocument(Map<String, Object> body) {
         Patient patient = currentUserService.getCurrentPatient();
         String name = String.valueOf(body.getOrDefault("name", "")).trim();
-        if (name.isBlank()) throw new ValidationException("Document name is required");
+        if (name.isBlank())
+            throw new ValidationException("Document name is required");
         PatientDocument document = new PatientDocument();
         document.setPatientId(patient.getId());
         document.setName(name);
@@ -635,7 +787,8 @@ public class PatientService {
         document.setSize(String.valueOf(body.getOrDefault("size", "Unknown")));
         document.setProvider(String.valueOf(body.getOrDefault("provider", "Patient Upload")));
         document = patientDocumentRepository.save(document);
-        return Map.of("id", document.getId(), "name", document.getName(), "category", document.getCategory(), "date", document.getDate(), "size", document.getSize(), "provider", document.getProvider());
+        return Map.of("id", document.getId(), "name", document.getName(), "category", document.getCategory(), "date",
+                document.getDate(), "size", document.getSize(), "provider", document.getProvider());
     }
 
     public List<Map<String, Object>> getLabTests() {
@@ -681,9 +834,11 @@ public class PatientService {
     }
 
     private List<Map<String, Object>> readJsonList(String json) {
-        if (json == null || json.isBlank()) return new ArrayList<>();
+        if (json == null || json.isBlank())
+            return new ArrayList<>();
         try {
-            return objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
+            return objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {
+            });
         } catch (Exception e) {
             return new ArrayList<>();
         }

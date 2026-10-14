@@ -54,28 +54,24 @@ export default function Reports() {
               tone="blue"
               value={data.summary.consultationsCompleted}
               label="Consultations Done"
-              delta="14% vs prior period"
             />
             <StatCard
               icon={FileCheck}
               tone="green"
               value={data.summary.prescriptionsIssued}
               label="Prescriptions Issued"
-              delta="9% vs prior period"
             />
             <StatCard
               icon={Sparkles}
               tone="purple"
               value={`${data.summary.aiAdoptionRate}%`}
               label="AI Assisted Consultations"
-              delta="22% adoption increase"
             />
             <StatCard
               icon={ShieldAlert}
               tone="orange"
               value={data.summary.allergyAlertsAvoided}
               label="Allergy Conflicts Caught"
-              delta="Safety net active"
             />
           </div>
 
@@ -141,30 +137,30 @@ export default function Reports() {
                 <div>
                   <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Speech-to-Text (Whisper) Accuracy</span>
-                    <strong style={{ color: 'var(--green)' }}>{data.aiQualityMetrics.transcriptionAccuracy}%</strong>
+                    <strong style={{ color: 'var(--green)' }}>{data.aiQualityMetrics.transcriptionAccuracy == null ? 'Not reported' : `${data.aiQualityMetrics.transcriptionAccuracy}%`}</strong>
                   </div>
                   <div style={{ width: '100%', height: 10, background: '#eef2ff', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ width: `${data.aiQualityMetrics.transcriptionAccuracy}%`, height: '100%', background: 'var(--green)' }} />
+                    <div style={{ width: `${data.aiQualityMetrics.transcriptionAccuracy ?? 0}%`, height: '100%', background: 'var(--green)' }} />
                   </div>
                 </div>
 
                 <div>
                   <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Canvas Handwriting (OCR) Recognition</span>
-                    <strong style={{ color: '#2563eb' }}>{data.aiQualityMetrics.ocrAccuracy}%</strong>
+                    <strong style={{ color: '#2563eb' }}>{data.aiQualityMetrics.ocrAccuracy == null ? 'Not reported' : `${data.aiQualityMetrics.ocrAccuracy}%`}</strong>
                   </div>
                   <div style={{ width: '100%', height: 10, background: '#eef2ff', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ width: `${data.aiQualityMetrics.ocrAccuracy}%`, height: '100%', background: '#2563eb' }} />
+                    <div style={{ width: `${data.aiQualityMetrics.ocrAccuracy ?? 0}%`, height: '100%', background: '#2563eb' }} />
                   </div>
                 </div>
 
                 <div>
                   <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>Doctor Draft Acceptance Without Overhaul</span>
-                    <strong style={{ color: '#7c3aed' }}>{data.aiQualityMetrics.doctorDraftAcceptanceRate}%</strong>
+                    <strong style={{ color: '#7c3aed' }}>{data.aiQualityMetrics.doctorDraftAcceptanceRate == null ? 'Not reported' : `${data.aiQualityMetrics.doctorDraftAcceptanceRate}%`}</strong>
                   </div>
                   <div style={{ width: '100%', height: 10, background: '#eef2ff', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ width: `${data.aiQualityMetrics.doctorDraftAcceptanceRate}%`, height: '100%', background: '#7c3aed' }} />
+                    <div style={{ width: `${data.aiQualityMetrics.doctorDraftAcceptanceRate ?? 0}%`, height: '100%', background: '#7c3aed' }} />
                   </div>
                 </div>
 
@@ -173,7 +169,7 @@ export default function Reports() {
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem' }}>
                       <Clock size={16} /> Average End-to-End Processing Time
                     </span>
-                    <strong>{data.aiQualityMetrics.avgProcessingSeconds}s</strong>
+                    <strong>{data.aiQualityMetrics.avgProcessingSeconds == null ? 'Not reported' : `${data.aiQualityMetrics.avgProcessingSeconds}s`}</strong>
                   </div>
                 </div>
               </div>

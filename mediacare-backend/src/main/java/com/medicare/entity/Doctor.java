@@ -25,10 +25,15 @@ public class Doctor {
     private String phone;
     private Double rating;
     private String status;
+    private Integer experienceYears;
+    @Transient
+    private Long consultsCount = 0L;
 
-    public Doctor() {}
+    public Doctor() {
+    }
 
-    public Doctor(String name, String specialization, String licenseNumber, String hospital, String email, String phone, Double rating, String status) {
+    public Doctor(String name, String specialization, String licenseNumber, String hospital, String email, String phone,
+            Double rating, String status) {
         this.name = name;
         this.specialization = specialization;
         this.licenseNumber = licenseNumber;
@@ -39,30 +44,91 @@ public class Doctor {
         this.status = status;
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getSpecialization() { return specialization; }
-    public void setSpecialization(String specialization) { this.specialization = specialization; }
+    public String getName() {
+        return name;
+    }
 
-    public String getLicenseNumber() { return licenseNumber; }
-    public void setLicenseNumber(String licenseNumber) { this.licenseNumber = licenseNumber; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    public String getHospital() { return hospital; }
-    public void setHospital(String hospital) { this.hospital = hospital; }
+    public String getSpecialization() {
+        return specialization;
+    }
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public void setSpecialization(String specialization) {
+        this.specialization = specialization;
+    }
 
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
+    public String getLicenseNumber() {
+        return licenseNumber;
+    }
 
-    public Double getRating() { return rating; }
-    public void setRating(Double rating) { this.rating = rating; }
+    public void setLicenseNumber(String licenseNumber) {
+        this.licenseNumber = licenseNumber;
+    }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public String getHospital() {
+        return hospital;
+    }
+
+    public void setHospital(String hospital) {
+        this.hospital = hospital;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public Double getRating() {
+        return rating;
+    }
+
+    public void setRating(Double rating) {
+        this.rating = rating;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Integer getExperienceYears() {
+        return experienceYears;
+    }
+
+    public void setExperienceYears(Integer experienceYears) {
+        this.experienceYears = experienceYears;
+    }
+
+    public Long getConsultsCount() {
+        return consultsCount;
+    }
+
+    public void setConsultsCount(Long consultsCount) {
+        this.consultsCount = consultsCount;
+    }
 }

@@ -5,22 +5,24 @@ import {
 } from 'lucide-react'
 import { patientApi } from '../../services/api'
 import { useAsync } from '../../hooks'
+import { useAuth } from '../../context/AuthContext'
 import {
   Card, PageHeader, StatusBadge, LoadingState, ErrorState,
   Modal, EmptyState
 } from '../../components/common/ui'
 
 export default function PatientLabTests() {
+  const { user } = useAuth()
   const { data: tests, loading, error, reload } = useAsync(patientApi.getLabTests)
   const [selectedTest, setSelectedTest] = useState(null)
 
   // Book lab test state
   const [showBookModal, setShowBookModal] = useState(false)
   const [bookingForm, setBookingForm] = useState({
-    testName: 'Lipid Profile & Glucose Panel',
-    category: 'Biochemistry',
-    date: '2026-10-15',
-    facility: 'MediCare Central Laboratory'
+    testName: '',
+    category: '',
+    date: '',
+    facility: ''
   })
   const [booking, setBooking] = useState(false)
 
@@ -166,24 +168,24 @@ export default function PatientLabTests() {
           <form onSubmit={handleBook}>
             <label className="field" style={{ marginBottom: 12 }}>
               Select Laboratory Test Panel
-              <select
+              <input
+                type="text"
+                required
                 value={bookingForm.testName}
-                onChange={e => {
-                  const val = e.target.value
-                  let cat = 'Biochemistry'
-                  if (val.includes('CBC') || val.includes('Blood')) cat = 'Hematology'
-                  if (val.includes('Thyroid') || val.includes('Hormone')) cat = 'Endocrinology'
-                  setBookingForm({ ...bookingForm, testName: val, category: cat })
-                }}
-              >
-                <option value="Lipid Profile & Glucose Panel">Lipid Profile & Glucose Panel (Fasting)</option>
-                <option value="Complete Blood Count (CBC)">Complete Blood Count (CBC) with Differential</option>
-                <option value="Comprehensive Renal Function (KFT)">Comprehensive Renal Function Panel (KFT)</option>
-                <option value="Liver Function Panel (LFT)">Liver Function Panel (LFT)</option>
-                <option value="Thyroid Profile (TSH, Free T3, Free T4)">Thyroid Profile (TSH, Free T3, Free T4)</option>
-                <option value="Vitamin D & B12 Screening">Vitamin D (25-OH) & Vitamin B12 Screening</option>
-                <option value="HbA1c Glycated Hemoglobin">HbA1c Glycated Hemoglobin (Diabetes Check)</option>
-              </select>
+                onChange={e => setBookingForm({ ...bookingForm, testName: e.target.value })}
+                placeholder="Enter laboratory test panel"
+              />
+            </label>
+
+            <label className="field" style={{ marginBottom: 12 }}>
+              Test Category
+              <input
+                type="text"
+                required
+                value={bookingForm.category}
+                onChange={e => setBookingForm({ ...bookingForm, category: e.target.value })}
+                placeholder="Enter test category"
+              />
             </label>
 
             <div className="grid-2" style={{ marginBottom: 12 }}>
@@ -199,14 +201,13 @@ export default function PatientLabTests() {
 
               <label className="field">
                 Laboratory Facility
-                <select
+                <input
+                  type="text"
+                  required
                   value={bookingForm.facility}
                   onChange={e => setBookingForm({ ...bookingForm, facility: e.target.value })}
-                >
-                  <option value="MediCare Central Laboratory">MediCare Central Laboratory</option>
-                  <option value="Peoria Diagnostic Center">Peoria Diagnostic Center</option>
-                  <option value="Apex Cardiology Lab Hub">Apex Cardiology Lab Hub</option>
-                </select>
+                  placeholder="Enter laboratory facility"
+                />
               </label>
             </div>
 
@@ -249,8 +250,7 @@ export default function PatientLabTests() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>
               <div>
-                <div>Patient: <strong>John Doe (42y / Male)</strong></div>
-                <div className="muted">MRN: MC-PAT-884910</div>
+                <div>Patient: <strong>{user?.name || 'Patient'}</strong></div>
               </div>
               <div>
                 <div>Ordering Doctor: <strong>{selectedTest.orderingDoctor}</strong></div>

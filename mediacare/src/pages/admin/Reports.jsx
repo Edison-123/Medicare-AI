@@ -26,7 +26,7 @@ export default function AdminReports() {
     loading,
     error,
     reload
-  } = useAsync(adminApi.getReports, [timeframe])
+  } = useAsync(() => adminApi.getReports(timeframe), [timeframe])
 
   const handleExport = () => {
     if (!data) return
@@ -164,7 +164,6 @@ export default function AdminReports() {
                 summary.consultationsCompleted ?? 0
               }
               label="Consultations Done"
-              delta="14% vs prior month"
             />
 
             <StatCard
@@ -174,7 +173,6 @@ export default function AdminReports() {
                 summary.prescriptionsIssued ?? 0
               }
               label="Prescriptions Issued"
-              delta="9.2% increase"
             />
 
             <StatCard
@@ -186,7 +184,6 @@ export default function AdminReports() {
                   : '0%'
               }
               label="AI Drafting Adoption"
-              delta="3.1% higher"
             />
 
             <StatCard
@@ -196,7 +193,6 @@ export default function AdminReports() {
                 summary.allergyAlertsAvoided ?? 0
               }
               label="Safety Interceptions"
-              delta="Zero adverse events"
             />
 
           </div>
@@ -205,7 +201,7 @@ export default function AdminReports() {
               MONTHLY TRENDS
           ====================================================== */}
 
-          <Card title="Monthly Clinical Volume Trends (Past 6 Months)">
+          <Card title="Monthly Clinical Volume Trends (Selected Period)">
 
             {monthlyTrends.length === 0 ? (
 
@@ -684,13 +680,13 @@ export default function AdminReports() {
                     color: 'var(--green)'
                   }}
                 >
-                  {aiQualityMetrics.transcriptionAccuracy ??
-                    0}
-                  %
+                  {aiQualityMetrics.transcriptionAccuracy == null
+                    ? 'Not reported'
+                    : `${aiQualityMetrics.transcriptionAccuracy}%`}
                 </div>
 
                 <div className="small muted">
-                  Whisper-Large-v3 Med
+                  Provider metrics unavailable
                 </div>
 
               </div>
@@ -715,13 +711,13 @@ export default function AdminReports() {
                     color: 'var(--primary)'
                   }}
                 >
-                  {aiQualityMetrics.ocrAccuracy ??
-                    0}
-                  %
+                  {aiQualityMetrics.ocrAccuracy == null
+                    ? 'Not reported'
+                    : `${aiQualityMetrics.ocrAccuracy}%`}
                 </div>
 
                 <div className="small muted">
-                  Canvas Ink Processing
+                  Provider metrics unavailable
                 </div>
 
               </div>
@@ -746,13 +742,13 @@ export default function AdminReports() {
                     color: 'var(--text)'
                   }}
                 >
-                  {aiQualityMetrics.doctorDraftAcceptanceRate ??
-                    0}
-                  %
+                  {aiQualityMetrics.doctorDraftAcceptanceRate == null
+                    ? 'Not reported'
+                    : `${aiQualityMetrics.doctorDraftAcceptanceRate}%`}
                 </div>
 
                 <div className="small muted">
-                  Accepted with minimal edits
+                  Review metrics unavailable
                 </div>
 
               </div>
@@ -777,13 +773,13 @@ export default function AdminReports() {
                     color: 'var(--text)'
                   }}
                 >
-                  {aiQualityMetrics.avgProcessingSeconds ??
-                    0}
-                  s
+                  {aiQualityMetrics.avgProcessingSeconds == null
+                    ? 'Not reported'
+                    : `${aiQualityMetrics.avgProcessingSeconds}s`}
                 </div>
 
                 <div className="small muted">
-                  End-to-end pipeline latency
+                  Processing latency unavailable
                 </div>
 
               </div>

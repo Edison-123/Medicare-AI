@@ -187,4 +187,18 @@ public class PatientController {
     public ResponseEntity<Patient> updateProfile(@Valid @RequestBody UpdateProfileRequest patient) {
         return ResponseEntity.ok(patientService.updateProfile(patient));
     }
+
+    @GetMapping("/settings")
+    @PreAuthorize("hasRole('PATIENT')")
+    @Operation(summary = "Get patient preferences and privacy settings")
+    public ResponseEntity<Map<String, Object>> getSettings() {
+        return ResponseEntity.ok(patientService.getSettings());
+    }
+
+    @PutMapping("/settings")
+    @PreAuthorize("hasRole('PATIENT')")
+    @Operation(summary = "Update patient preferences and privacy settings")
+    public ResponseEntity<Map<String, Object>> updateSettings(@RequestBody Map<String, Object> settings) {
+        return ResponseEntity.ok(patientService.updateSettings(settings));
+    }
 }

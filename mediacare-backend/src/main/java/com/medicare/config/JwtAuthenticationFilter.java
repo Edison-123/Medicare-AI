@@ -28,29 +28,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
+        final String jwt = extractToken(request, authHeader);
         final String userEmail;
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
+        if (jwtService.isUnsecuredToken(jwt) && !jwtService.allowsUnsecuredTokens()) {
+            org.slf4j.LoggerFactory.getLogger(JwtAuthenticationFilter.class)
+                    .debug("Skipping insecure JWT for request [{}]: unsecured tokens are disabled by default.",
+                            request.getRequestURI());
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
             userEmail = jwtService.extractUsername(jwt);
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 userRepository.findByEmailIgnoreCase(userEmail).ifPresent(user -> {
-                    if (jwtService.isTokenValid(jwt, user.getEmail())) {
+                    if (jwtService.isTokenValid(jwt, user.getEmail(), user.getTokenVersion())) {
                         String roleName = user.getRole().name();
                         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                                 user,
                                 null,
-                                List.of(new SimpleGrantedAuthority(roleName))
-                        );
+                                List.of(new SimpleGrantedAuthority(roleName)));
                         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         SecurityContextHolder.getContext().setAuthentication(authToken);
                     }
@@ -58,9 +64,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         } catch (Exception ex) {
             org.slf4j.LoggerFactory.getLogger(JwtAuthenticationFilter.class)
-                    .warn("JWT authentication processing failed for request [{}]: {}", request.getRequestURI(), ex.getMessage());
+                    .warn("JWT authentication processing failed for request [{}]: {}", request.getRequestURI(),
+                            ex.getMessage());
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String extractToken(HttpServletRequest request, String authHeader) {
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("MC_AUTH".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return authHeader != null && authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;
     }
 }

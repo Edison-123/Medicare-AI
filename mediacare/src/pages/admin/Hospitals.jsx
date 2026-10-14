@@ -23,14 +23,14 @@ export default function AdminHospitals() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({
     name: '',
-    code: 'HSP-0',
-    type: 'Regional Hospital',
-    city: 'Springfield, IL',
+    code: '',
+    type: '',
+    city: '',
     address: '',
-    director: 'Dr. ',
-    departmentsCount: 6,
-    doctorsCount: 10,
-    bedsTotal: 150
+    director: '',
+    departmentsCount: '',
+    doctorsCount: '',
+    bedsTotal: ''
   })
   const [adding, setAdding] = useState(false)
 
@@ -43,14 +43,14 @@ export default function AdminHospitals() {
       setShowAddModal(false)
       setAddForm({
         name: '',
-        code: 'HSP-0',
-        type: 'Regional Hospital',
-        city: 'Springfield, IL',
+        code: '',
+        type: '',
+        city: '',
         address: '',
-        director: 'Dr. ',
-        departmentsCount: 6,
-        doctorsCount: 10,
-        bedsTotal: 150
+        director: '',
+        departmentsCount: '',
+        doctorsCount: '',
+        bedsTotal: ''
       })
       reload()
     } finally {
@@ -171,12 +171,9 @@ export default function AdminHospitals() {
 
               {/* Footer Integration Status */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--line)', paddingTop: 12, marginTop: 10, fontSize: '0.78rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--green)', fontWeight: 600 }}>
-                  <span className="ping-indicator" /> {hosp.apiStatus}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: hosp.apiStatus === 'Not tested' ? 'var(--muted)' : 'var(--green)', fontWeight: 600 }}>
+                  {hosp.apiStatus !== 'Not tested' && <span className="ping-indicator" />} {hosp.apiStatus}
                 </span>
-                <button className="btn btn-sm" onClick={() => alert(`Diagnostics ping for ${hosp.name}: 100% packets returned (0% loss)`)}>
-                  Test Ping
-                </button>
               </div>
             </Card>
           )
@@ -197,7 +194,7 @@ export default function AdminHospitals() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Lakeview Community Hospital"
+                  placeholder="Enter facility name"
                   value={addForm.name}
                   onChange={e => setAddForm({ ...addForm, name: e.target.value })}
                 />
@@ -208,7 +205,7 @@ export default function AdminHospitals() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g., LCH-07"
+                  placeholder="Enter facility code"
                   value={addForm.code}
                   onChange={e => setAddForm({ ...addForm, code: e.target.value })}
                 />
@@ -221,7 +218,9 @@ export default function AdminHospitals() {
                 <select
                   value={addForm.type}
                   onChange={e => setAddForm({ ...addForm, type: e.target.value })}
+                  required
                 >
+                  <option value="">Select facility type</option>
                   <option value="Tertiary Care Hospital">Tertiary Care Hospital</option>
                   <option value="Community Health Hospital">Community Health Hospital</option>
                   <option value="Specialty Medical Institute">Specialty Medical Institute</option>
@@ -246,7 +245,7 @@ export default function AdminHospitals() {
               <input
                 type="text"
                 required
-                placeholder="e.g., 500 Lakeview Avenue, Springfield, IL"
+                placeholder="Enter street address"
                 value={addForm.address}
                 onChange={e => setAddForm({ ...addForm, address: e.target.value })}
               />

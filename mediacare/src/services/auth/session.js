@@ -1,7 +1,17 @@
-// NOTE: sessionStorage is a dev convenience. In production prefer an httpOnly, Secure, SameSite cookie set by Spring.
 const K = 'mc_session'
-export const saveSession = s => sessionStorage.setItem(K, JSON.stringify(s))
+export const saveSession = session => {
+	const user = session?.user ?? session
+	if (user) sessionStorage.setItem(K, JSON.stringify({ user }))
+}
 export const clearSession = () => sessionStorage.removeItem(K)
-export const loadSession = () => { try { return JSON.parse(sessionStorage.getItem(K)) } catch { return null } }
-export const getToken = () => loadSession()?.token
-export const isExpired = token => { try { return JSON.parse(atob(token.split('.')[1])).exp * 1000 < Date.now() } catch { return true } }
+export const loadSession = () => {
+	try {
+		const session = JSON.parse(sessionStorage.getItem(K))
+		if (session?.token) sessionStorage.removeItem(K)
+		return session?.user ? { user: session.user } : null
+	} catch {
+		clearSession()
+		return null
+	}
+}
+export const getToken = () => undefined

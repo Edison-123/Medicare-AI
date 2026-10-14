@@ -135,7 +135,6 @@ export default function Settings() {
                   <option value="whisper-large-v3-med">Whisper Large v3 (Clinical fine-tuned)</option>
                   <option value="llama-3-med-70b">Llama-3 Med 70B (Clinical Summary)</option>
                   <option value="gpt-4o-medical">GPT-4o Medical Copilot</option>
-                  <option value="mock-demo-engine">Mock Engine (Local Dev)</option>
                 </select>
               </label>
             </div>

@@ -9,13 +9,6 @@ import {
   Card, PageHeader, LoadingState, ErrorState
 } from '../../components/common/ui'
 
-const QUICK_CHIPS = [
-  'My blood pressure today was 126/80 mmHg.',
-  'Can I take paracetamol for a mild headache?',
-  'I would like to request a prescription renewal.',
-  'Confirming my next clinic visit on Oct 12.'
-]
-
 export default function PatientMessages() {
   const { data: thread, loading, error, reload } = useAsync(patientApi.getMessages)
   const [inputText, setInputText] = useState('')
@@ -42,19 +35,15 @@ export default function PatientMessages() {
     }
   }
 
-  const handleChipClick = (msg) => {
-    setInputText(msg)
-  }
-
   return (
     <>
       <PageHeader
         title="Direct Care Team Messages"
-        subtitle="Chat directly with Dr. John Smith and your clinic triage team for follow-up questions and refill guidance."
+        subtitle="Chat with your care team about follow-up questions and prescription guidance."
         actions={
           <div className="row">
             <span className="row" style={{ fontSize: '0.85rem', color: 'var(--muted)', background: '#fff', border: '1px solid var(--line)', padding: '6px 12px', borderRadius: 10 }}>
-              <span className="ping-indicator" /> Dr. John Smith (In Clinic)
+              <span className="ping-indicator" /> Care team
             </span>
           </div>
         }
@@ -68,10 +57,10 @@ export default function PatientMessages() {
           {/* Chat Header Bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--line)', background: '#fafbfc' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div className="avatar" style={{ width: 44, height: 44 }}>JS</div>
+              <div className="avatar" style={{ width: 44, height: 44 }}>CT</div>
               <div>
-                <strong style={{ fontSize: '1.05rem' }}>Dr. John Smith, MD</strong>
-                <div className="muted small">Internal Medicine & Pulmonology • MediCare Central Hospital</div>
+                <strong style={{ fontSize: '1.05rem' }}>Care team</strong>
+                <div className="muted small">Secure patient messaging</div>
               </div>
             </div>
 
@@ -124,7 +113,7 @@ export default function PatientMessages() {
                   >
                     {!isPatient && (
                       <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', marginBottom: 4 }}>
-                        Dr. John Smith
+                        Care team
                       </div>
                     )}
                     {m.text}
@@ -136,24 +125,6 @@ export default function PatientMessages() {
                 </div>
               )
             })}
-          </div>
-
-          {/* Quick Suggestion Chips */}
-          <div style={{ padding: '8px 16px', background: '#fff', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, overflowX: 'auto' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--muted)', alignSelf: 'center', whiteSpace: 'nowrap' }}>
-              Quick prompts:
-            </span>
-            {QUICK_CHIPS.map((chip, i) => (
-              <button
-                key={i}
-                type="button"
-                className="btn btn-sm"
-                style={{ fontSize: '0.78rem', whiteSpace: 'nowrap', borderRadius: 99 }}
-                onClick={() => handleChipClick(chip)}
-              >
-                {chip}
-              </button>
-            ))}
           </div>
 
           {/* Message Input Box */}
@@ -172,7 +143,7 @@ export default function PatientMessages() {
               type="text"
               value={inputText}
               onChange={e => setInputText(e.target.value)}
-              placeholder="Type your message or health question to Dr. Smith…"
+              placeholder="Type a message or health question…"
               style={{
                 flex: 1,
                 border: '1px solid var(--line)',

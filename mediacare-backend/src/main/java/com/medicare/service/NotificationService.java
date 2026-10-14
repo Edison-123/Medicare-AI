@@ -24,7 +24,8 @@ public class NotificationService {
     }
 
     private void validateRoleAccess(String roleKind) {
-        if (roleKind == null || (!roleKind.equalsIgnoreCase("patient") && !roleKind.equalsIgnoreCase("doctor") && !roleKind.equalsIgnoreCase("admin"))) {
+        if (roleKind == null || (!roleKind.equalsIgnoreCase("patient") && !roleKind.equalsIgnoreCase("doctor")
+                && !roleKind.equalsIgnoreCase("admin"))) {
             throw new ValidationException("Role must be 'patient', 'doctor', or 'admin'");
         }
         User user = currentUserService.getUser();
@@ -42,7 +43,7 @@ public class NotificationService {
         if (user.getRole() == Role.ROLE_ADMIN) {
             return notificationRepository.findByRoleKindOrderByIdDesc(roleKind.toLowerCase());
         }
-        return notificationRepository.findByRoleKindAndUserId(roleKind.toLowerCase(), user.getId());
+        return notificationRepository.findByRoleKindAndUserIdOrderByIdDesc(roleKind.toLowerCase(), user.getId());
     }
 
     public ApiResponse markAllAsRead(String roleKind) {

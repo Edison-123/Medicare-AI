@@ -10,7 +10,7 @@ import CommandPalette from '../common/CommandPalette'
 const NAV = {
   doctor: { theme:'doctor', brand:'Smart Prescription Platform', items:[
     ['dashboard','Dashboard',LayoutDashboard],['patients','Patients',Users],['consultations','Consultations',Stethoscope],['prescriptions','Prescriptions',FileText],
-    ['ai-tools','AI Tools',Sparkles],['reports','Reports',BarChart3],['messages','Messages',MessageSquare,3],['settings','Settings',Settings]] },
+    ['ai-tools','AI Tools',Sparkles],['reports','Reports',BarChart3],['messages','Messages',MessageSquare],['settings','Settings',Settings]] },
   patient: { theme:'patient', brand:'Your Health, Our Priority', items:[
     ['dashboard','Dashboard',LayoutDashboard],['prescriptions','Prescriptions',FileText],['medical-records','Medical Records',FolderHeart],['visit-summaries','Visit Summaries',ClipboardList],
     ['lab-tests','Lab Tests',FlaskConical],['appointments','Appointments',CalendarDays],['medicine-reminders','Medicine Reminders',Pill],['messages','Messages',MessageSquare],
@@ -38,6 +38,8 @@ function AppLayout({ kind }) {
 
   useEffect(() => {
     loadNotifs()
+    const refreshId = window.setInterval(loadNotifs, 15000)
+    return () => window.clearInterval(refreshId)
   }, [kind])
 
   // Global Ctrl+K / Cmd+K listener
@@ -102,9 +104,7 @@ function AppLayout({ kind }) {
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCmdOpen(true) }}
         >
           <Search size={16} />
-          <span style={{ flex: 1, color: 'var(--muted)', fontSize: '0.85rem' }}>
-            {kind === 'doctor' ? 'Search patients, prescriptions…' : kind === 'admin' ? 'Search logs, hospitals, doctors…' : 'Search health records, medicines…'}
-          </span>
+          <span style={{ flex: 1, color: 'var(--muted)', fontSize: '0.85rem' }}>Find a page…</span>
           <span className="cmd-shortcut">Ctrl K</span>
         </div>
         <div className="row" style={{ position: 'relative' }} ref={notifRef}>
@@ -168,7 +168,7 @@ function AppLayout({ kind }) {
                             {n.title}
                           </strong>
                           <span style={{ fontSize: '0.72rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                            {n.time}
+                            {n.timeAgo || n.time}
                           </span>
                         </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.35 }}>

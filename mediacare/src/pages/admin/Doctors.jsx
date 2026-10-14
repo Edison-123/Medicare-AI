@@ -25,16 +25,17 @@ export default function AdminDoctors() {
     () => adminApi.getDoctors({ q: debouncedSearch, department: dept, status: statusFilter }),
     [debouncedSearch, dept, statusFilter]
   )
+  const { data: hospitals } = useAsync(adminApi.getHospitals)
 
   // Add doctor modal state
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({
     name: '',
     email: '',
-    specialization: 'Internal Medicine',
-    hospital: 'MediCare Central Hospital',
-    license: 'MED-REG-',
-    experienceYears: 5
+    specialization: '',
+    hospital: '',
+    license: '',
+    experienceYears: ''
   })
   const [adding, setAdding] = useState(false)
 
@@ -50,15 +51,15 @@ export default function AdminDoctors() {
     if (!addForm.name.trim() || !addForm.email.trim()) return
     setAdding(true)
     try {
-      await adminApi.addDoctor(addForm)
+      await adminApi.addDoctor({ ...addForm, licenseNumber: addForm.license })
       setShowAddModal(false)
       setAddForm({
         name: '',
         email: '',
-        specialization: 'Internal Medicine',
-        hospital: 'MediCare Central Hospital',
-        license: 'MED-REG-',
-        experienceYears: 5
+        specialization: '',
+        hospital: '',
+        license: '',
+        experienceYears: ''
       })
       reload()
     } finally {
@@ -169,9 +170,9 @@ export default function AdminDoctors() {
                       <strong>{doc.specialization}</strong>
                       <div className="muted small">{doc.hospital}</div>
                     </td>
-                    <td><code>{doc.license}</code></td>
-                    <td>{doc.experienceYears} yrs</td>
-                    <td>{doc.consultsCount}</td>
+                    <td><code>{doc.licenseNumber || 'Not on file'}</code></td>
+                    <td>{Number.isFinite(doc.experienceYears) ? `${doc.experienceYears} yrs` : 'Not recorded'}</td>
+                    <td>{doc.consultsCount ?? 0}</td>
                     <td>
                       {doc.rating > 0 ? (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
@@ -245,7 +246,7 @@ export default function AdminDoctors() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Dr. Rachel Patel"
+                  placeholder="Enter doctor's full name"
                   value={addForm.name}
                   onChange={e => setAddForm({ ...addForm, name: e.target.value })}
                 />
@@ -256,7 +257,7 @@ export default function AdminDoctors() {
                 <input
                   type="email"
                   required
-                  placeholder="rachel.patel@medicare.ai"
+                  placeholder="name@organization.org"
                   value={addForm.email}
                   onChange={e => setAddForm({ ...addForm, email: e.target.value })}
                 />
@@ -269,7 +270,7 @@ export default function AdminDoctors() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Interventional Cardiology"
+                  placeholder="Enter medical specialization"
                   value={addForm.specialization}
                   onChange={e => setAddForm({ ...addForm, specialization: e.target.value })}
                 />
@@ -280,12 +281,12 @@ export default function AdminDoctors() {
                 <select
                   value={addForm.hospital}
                   onChange={e => setAddForm({ ...addForm, hospital: e.target.value })}
+                  required
                 >
-                  <option value="MediCare Central Hospital">MediCare Central Hospital</option>
-                  <option value="St. Jude Community Health">St. Jude Community Health</option>
-                  <option value="Apex Heart & Lung Institute">Apex Heart & Lung Institute</option>
-                  <option value="Metro Children's Clinic">Metro Children's Clinic</option>
-                  <option value="Westside Urgent Care">Westside Urgent Care</option>
+                  <option value="">Select a hospital</option>
+                  {(hospitals || []).map(hospital => (
+                    <option key={hospital.id} value={hospital.name}>{hospital.name}</option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -296,7 +297,7 @@ export default function AdminDoctors() {
                 <input
                   type="text"
                   required
-                  placeholder="MED-REG-XXXXXX"
+                  placeholder="Enter license number"
                   value={addForm.license}
                   onChange={e => setAddForm({ ...addForm, license: e.target.value })}
                 />
@@ -349,16 +350,16 @@ export default function AdminDoctors() {
 
             <div className="dl" style={{ background: '#f8fafc', padding: 14, borderRadius: 8 }}>
               <dt>License Registration</dt>
-              <dd><code>{inspectDoc.license}</code></dd>
+              <dd><code>{inspectDoc.licenseNumber || 'Not on file'}</code></dd>
 
               <dt>Affiliated Hospital</dt>
               <dd><strong>{inspectDoc.hospital}</strong></dd>
 
               <dt>Clinical Experience</dt>
-              <dd>{inspectDoc.experienceYears} years active practice</dd>
+              <dd>{Number.isFinite(inspectDoc.experienceYears) ? `${inspectDoc.experienceYears} years active practice` : 'Not recorded'}</dd>
 
               <dt>Consultations Done</dt>
-              <dd>{inspectDoc.consultsCount} verified consultations</dd>
+              <dd>{inspectDoc.consultsCount ?? 0} verified consultations</dd>
 
               <dt>Patient Rating</dt>
               <dd>{inspectDoc.rating > 0 ? `★ ${inspectDoc.rating} / 5.0` : 'No reviews yet'}</dd>

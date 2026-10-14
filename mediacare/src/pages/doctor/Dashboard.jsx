@@ -94,7 +94,7 @@ export default function DoctorDashboard() {
         <Card title="AI Transcription Overview"><div className="ai-ov"><Donut parts={data.aiOverview.parts} total={data.aiOverview.total} />
           <ul className="legend">{data.aiOverview.parts.map((p, i) => <li key={p.label}><i style={{ background:COLORS[i] }} />{p.label}
             <b>{p.value} ({Math.round(p.value / data.aiOverview.total * 100)}%)</b></li>)}
-            <li className="acc">Accuracy Rate <b>{data.aiOverview.accuracy}%</b></li></ul></div></Card>
+            <li className="acc">Accuracy Rate <b>{data.aiOverview.accuracy == null ? 'Not reported' : `${data.aiOverview.accuracy}%`}</b></li></ul></div></Card>
         <Card title="Recent Prescriptions" action={<Link className="link" to="/doctor/prescriptions">View all</Link>}>
           <ul className="list">{data.recentRx.map((r, index) => <li key={r.id ?? `${r.patient}-${r.when}-${index}`}><span className="rx-ico">℞</span>
             <div className="grow"><strong>{r.patient}</strong><div className="muted small">{r.when}</div></div><StatusBadge status={r.status} /></li>)}</ul></Card>

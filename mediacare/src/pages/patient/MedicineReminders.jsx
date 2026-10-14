@@ -19,14 +19,14 @@ export default function PatientMedicineReminders() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [reminderForm, setReminderForm] = useState({
     medicineName: '',
-    strength: '500 mg',
-    dosage: '1 tablet',
-    slot: 'Morning',
-    time: '08:00 AM',
-    food: 'After breakfast',
-    instructions: 'Take with water',
-    totalPills: 30,
-    remainingPills: 30
+    strength: '',
+    dosage: '',
+    slot: '',
+    time: '',
+    food: '',
+    instructions: '',
+    totalPills: 0,
+    remainingPills: 0
   })
   const [saving, setSaving] = useState(false)
 
@@ -55,14 +55,14 @@ export default function PatientMedicineReminders() {
       setShowAddModal(false)
       setReminderForm({
         medicineName: '',
-        strength: '500 mg',
-        dosage: '1 tablet',
-        slot: 'Morning',
-        time: '08:00 AM',
-        food: 'After breakfast',
-        instructions: 'Take with water',
-        totalPills: 30,
-        remainingPills: 30
+        strength: '',
+        dosage: '',
+        slot: '',
+        time: '',
+        food: '',
+        instructions: '',
+        totalPills: 0,
+        remainingPills: 0
       })
       reload()
     } finally {
@@ -115,10 +115,10 @@ export default function PatientMedicineReminders() {
                   <Flame size={24} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>14 Days</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>Not reported</div>
                   <div className="muted small">Consecutive Adherence Streak</div>
                   <div style={{ fontSize: '0.75rem', color: '#ea580c', marginTop: 2 }}>
-                    🔥 Top 5% adherent patient
+                    Streak tracking is unavailable
                   </div>
                 </div>
               </div>
@@ -133,7 +133,7 @@ export default function PatientMedicineReminders() {
                   <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{totalCount} Daily</div>
                   <div className="muted small">Prescribed Active Regimens</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginTop: 2 }}>
-                    Verified by Dr. John Smith
+                    Linked to your active prescriptions
                   </div>
                 </div>
               </div>
@@ -229,7 +229,7 @@ export default function PatientMedicineReminders() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Amlodipine, Metformin"
+                  placeholder="Enter medicine name"
                   value={reminderForm.medicineName}
                   onChange={e => setReminderForm({ ...reminderForm, medicineName: e.target.value })}
                 />
@@ -261,8 +261,10 @@ export default function PatientMedicineReminders() {
                 Time of Day
                 <select
                   value={reminderForm.slot}
+                  required
                   onChange={e => setReminderForm({ ...reminderForm, slot: e.target.value })}
                 >
+                  <option value="">Select time of day</option>
                   <option value="Morning">Morning (Breakfast)</option>
                   <option value="Afternoon">Afternoon (Lunch)</option>
                   <option value="Evening">Evening (Dinner)</option>
@@ -286,8 +288,10 @@ export default function PatientMedicineReminders() {
                 Food Instructions
                 <select
                   value={reminderForm.food}
+                  required
                   onChange={e => setReminderForm({ ...reminderForm, food: e.target.value })}
                 >
+                  <option value="">Select food timing</option>
                   <option value="After breakfast">After breakfast</option>
                   <option value="Before meals">Before meals</option>
                   <option value="With food">With food</option>

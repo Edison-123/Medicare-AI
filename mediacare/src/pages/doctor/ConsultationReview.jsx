@@ -1,51 +1,158 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertTriangle, Sparkles, Printer, FileText, Share2, ClipboardCheck, MessageSquare, ArrowRight } from 'lucide-react'
+import { AlertTriangle, Sparkles, Printer, FileText, ClipboardCheck, MessageSquare, Check, X } from 'lucide-react'
 import { consultationsApi } from '../../services/api'
 import { speechToText, llm } from '../../services/ai'
 import { useAuth } from '../../context/AuthContext'
 import { useAsync } from '../../hooks'
 import Recorder from '../../components/ai/Recorder'
-import { Avatar, Card, StatusBadge, PageHeader, LoadingState, ErrorState, ConfirmationDialog, AIDraftBanner, Modal } from '../../components/common/ui'
+import { Avatar, Card, StatusBadge, PageHeader, LoadingState, ErrorState, ConfirmationDialog, Modal } from '../../components/common/ui'
 
-const DRAFT_FIELDS = [['chiefComplaint', 'Chief complaint'], ['symptoms', 'Symptoms'], ['diagnosis', 'Diagnosis'], ['medications', 'Medications'],
-  ['investigations', 'Investigations'], ['plan', 'Treatment plan'], ['followUp', 'Follow-up']]
+const DRAFT_FIELDS = [['chiefComplaint', 'Chief complaint'], ['symptoms', 'Symptoms and history'], ['vitals', 'Vitals'],
+  ['exam', 'Physical examination / findings'], ['diagnosis', 'Diagnosis / assessment'], ['diagnosisStatus', 'Diagnosis status'], ['medications', 'Medications'],
+  ['investigations', 'Investigations'], ['plan', 'Treatment plan'], ['followUp', 'Follow-up and safety instructions']]
 
 const F = ({ label, children }) => <label className="field">{label}{children}</label>
+const hasValue = value => value && typeof value === 'object'
+  ? Object.values(value).some(hasValue)
+  : String(value ?? '').trim().length > 0
+const sameValue = (left, right) => JSON.stringify(left ?? '').trim().toLowerCase() === JSON.stringify(right ?? '').trim().toLowerCase()
+const VITAL_FIELDS = ['bp', 'hr', 'temp', 'spo2', 'recordedAt']
 
 export default function ConsultationReview({ data, initialAi }) {
   const nav = useNavigate(); const { user } = useAuth(); const consultationId = data.id
-  const defaultForm = { chiefComplaint:'', symptoms:'', vitals:{ bp:'', hr:'', temp:'', spo2:'' }, exam:'', diagnosis:'', notes:'', plan:'', followUp:'' }
-  const defaultAi = { transcript:'', handwritten:'', stt:'Idle', llm:'Idle', draft:null }
-  const [form, setForm] = useState({ ...defaultForm, ...(data.form || {}), vitals:{ ...defaultForm.vitals, ...(data.form?.vitals || {}) } })
-  const [ai, setAi] = useState({ ...defaultAi, ...(initialAi || {}) })
+  const defaultForm = { chiefComplaint:'', symptoms:'', vitals:{ bp:'', hr:'', temp:'', spo2:'', recordedAt:'' }, exam:'', diagnosis:'', diagnosisStatus:'',
+    medications:'', investigations:'', notes:'', plan:'', followUp:'' }
+  const defaultAi = { transcript:'', handwritten:'', stt:'Idle', llm:'Idle', sttError:'', ocrError:'', llmError:'', extraction:null }
+  const [form, setForm] = useState(() => {
+    const saved = { ...defaultForm, ...(data.form || {}), notes:data.form?.notes ?? data.doctorNotes ?? '',
+      vitals:{ ...defaultForm.vitals, ...(data.form?.vitals || {}) } }
+    const legacyFields = initialAi?.draft?.fields
+    if (legacyFields && initialAi.draft.review !== 'Reviewed') {
+      for (const [key] of DRAFT_FIELDS) {
+        if (key === 'vitals') {
+          for (const vital of VITAL_FIELDS) {
+            if (!hasValue(saved.vitals[vital]) && hasValue(legacyFields.vitals?.[vital])) saved.vitals[vital] = legacyFields.vitals[vital]
+          }
+        } else if (!hasValue(saved[key]) && hasValue(legacyFields[key])) saved[key] = legacyFields[key]
+      }
+    }
+    return saved
+  })
+  const [ai, setAi] = useState(() => {
+    const saved = { ...defaultAi, ...(initialAi || {}) }
+    if (!saved.extraction && saved.draft?.fields) {
+      const fieldReview = Object.fromEntries(DRAFT_FIELDS.flatMap(([key]) => key === 'vitals'
+        ? [hasValue(saved.draft.fields.vitals) ? [key, saved.draft.review === 'Reviewed' ? 'Confirmed' : 'Needs review'] : null].filter(Boolean)
+        : hasValue(saved.draft.fields[key]) ? [[key, saved.draft.review === 'Reviewed' ? 'Confirmed' : 'Needs review']] : []))
+      saved.extraction = { fields:saved.draft.fields, evidence:saved.draft.evidence || {}, fieldReview,
+        autoFilled:Object.keys(fieldReview).filter(key => fieldReview[key] === 'Needs review') }
+    }
+    return saved
+  })
   const [busy, setBusy] = useState(false); const [msg, setMsg] = useState(null); const [dialog, setDialog] = useState(null)
   const [labTests, setLabTests] = useState('Complete Blood Count (CBC)\nSerum Electrolytes\nChest X-Ray (PA View)')
 
 
   const p = data.patientInfo, locked = data.status === 'Completed' || data.status === 'Cancelled'
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v })); const setVital = (k, v) => setForm(f => ({ ...f, vitals:{ ...f.vitals, [k]: v } }))
   const patchAi = x => setAi(a => ({ ...a, ...x })); const flash = (type, text) => setMsg({ type, text })
+  const updateFieldReview = (key, status) => setAi(current => {
+    const fieldReview = { ...current.extraction.fieldReview, [key]:status }
+    const hasPending = Object.values(fieldReview).includes('Needs review')
+    return { ...current, llm:hasPending ? 'Completed' : 'Reviewed', extraction:{ ...current.extraction, fieldReview } }
+  })
+  const set = (key, value) => {
+    setForm(current => ({ ...current, [key]:value }))
+    if (ai.extraction?.fieldReview?.[key] === 'Needs review') updateFieldReview(key, hasValue(value) ? 'Corrected' : 'Rejected')
+  }
+  const setVital = (key, value) => {
+    setForm(current => ({ ...current, vitals:{ ...current.vitals, [key]:value } }))
+    if (ai.extraction?.fieldReview?.vitals === 'Needs review') updateFieldReview('vitals', 'Corrected')
+  }
 
   const transcribe = async audio => {
     patchAi({ stt:'Processing' }); setMsg(null)
-    try { const r = await speechToText.transcribe(audio, { consultationId }); patchAi({ transcript:r.text, stt:'Completed', sttProvider:r.provider }) }
-    catch { patchAi({ stt:'Failed' }); flash('err', 'Transcription failed. Record again or upload a different file.') }
+    try { const r = await speechToText.transcribe(audio, { consultationId }); patchAi({ transcript:r.text, stt:'Completed', sttProvider:r.provider, sttError:'' }) }
+    catch (e) { patchAi({ stt:'Failed', sttError:e.message }); flash('err', e.message || 'Transcription failed. Record again or upload a different file.') }
   }
   const summarize = async () => {
     patchAi({ llm:'Processing' }); setMsg(null)
-    try { const r = await llm.summarize({ transcript:ai.transcript, handwritten:ai.handwritten, notes:form.notes })
-      patchAi({ llm:'Completed', draft:{ fields:r.fields, provider:r.provider, review:'Pending', reviewedBy:null } }) }
-    catch { patchAi({ llm:'Failed' }); flash('err', 'Summary generation failed. Try again.') }
+    const consultation = {
+      chiefComplaint:form.chiefComplaint, symptoms:form.symptoms, vitals:form.vitals, exam:form.exam,
+      diagnosis:form.diagnosis, diagnosisStatus:form.diagnosisStatus, medications:form.medications,
+      investigations:form.investigations, plan:form.plan, followUp:form.followUp, notes:form.notes
+    }
+    try {
+      const r = await llm.summarize({ transcript:ai.transcript, handwritten:ai.handwritten, notes:form.notes, consultation })
+      const fields = {
+        chiefComplaint:'', symptoms:'', vitals:{ bp:'', hr:'', temp:'', spo2:'', recordedAt:'' }, exam:'', diagnosis:'',
+        medications:'', investigations:'', plan:'', followUp:'', ...(r.fields || {})
+      }
+      fields.vitals = { bp:'', hr:'', temp:'', spo2:'', recordedAt:'', ...(r.fields?.vitals || {}) }
+      const evidence = r.evidence || {}
+      const fieldReview = {}
+      const autoFilled = []
+      const nextForm = { ...form, vitals:{ ...form.vitals } }
+      for (const [key] of DRAFT_FIELDS) {
+        if (key === 'vitals') {
+          const addedVitals = []
+          for (const vital of VITAL_FIELDS) {
+            const source = evidence.vitals?.[vital]
+            if (!hasValue(nextForm.vitals[vital]) && hasValue(fields.vitals[vital]) && source?.source !== 'consultation' && hasValue(source?.quote)) {
+              nextForm.vitals[vital] = fields.vitals[vital]
+              addedVitals.push(vital)
+            }
+          }
+          if (addedVitals.length) {
+            fieldReview.vitals = 'Needs review'
+            autoFilled.push('vitals')
+          }
+        } else {
+          const source = evidence[key]
+          if (!hasValue(nextForm[key]) && hasValue(fields[key]) && source?.source !== 'consultation' && hasValue(source?.quote)) {
+            nextForm[key] = fields[key]
+            fieldReview[key] = 'Needs review'
+            autoFilled.push(key)
+          }
+        }
+      }
+      setForm(nextForm)
+      patchAi({ llm:'Completed', llmError:'', extraction:{ fields, evidence, fieldReview, autoFilled, provider:r.provider } })
+    }
+    catch (e) { patchAi({ llm:'Failed', llmError:e.message }); flash('err', e.message || 'Summary generation failed. Try again.') }
   }
-  const editDraft = (k, v) => patchAi({ draft:{ ...ai.draft, fields:{ ...ai.draft.fields, [k]: v } } })
-  const applyDraft = () => { // explicit doctor action: the only way AI text enters the record
-    const d = ai.draft.fields
-    setForm(f => ({ ...f, chiefComplaint:d.chiefComplaint || f.chiefComplaint, symptoms:d.symptoms || f.symptoms, diagnosis:d.diagnosis || f.diagnosis,
-      plan:d.plan || f.plan, followUp:d.followUp || f.followUp,
-      notes:[f.notes, d.medications && `Medications (AI-assisted): ${d.medications}`, d.investigations && `Investigations (AI-assisted): ${d.investigations}`].filter(Boolean).join('\n') }))
-    patchAi({ draft:{ ...ai.draft, review:'Reviewed', reviewedBy:user.name }, llm:'Reviewed' }); setDialog(null)
-    flash('ok', 'AI draft applied to the consultation. Review the fields below, then save.')
+  const rejectExtraction = key => {
+    const extraction = ai.extraction
+    if (extraction?.autoFilled?.includes(key)) {
+      setForm(current => {
+        if (key === 'vitals') {
+          const vitals = { ...current.vitals }
+          for (const vital of VITAL_FIELDS) {
+            if (sameValue(vitals[vital], extraction.fields.vitals?.[vital])) vitals[vital] = ''
+          }
+          return { ...current, vitals }
+        }
+        return sameValue(current[key], extraction.fields[key]) ? { ...current, [key]:'' } : current
+      })
+    }
+    updateFieldReview(key, 'Rejected')
+  }
+  const renderFieldReview = key => {
+    const status = ai.extraction?.fieldReview?.[key]
+    if (!status) return null
+    const evidence = ai.extraction.evidence?.[key]
+    const quote = typeof evidence === 'string' ? evidence : evidence?.quote || evidence?.text
+    const sourceName = typeof evidence === 'object' ? evidence?.source : ''
+    const sourceLabel = { doctor_audio:'Doctor-labeled transcript', audio_transcript:'Unattributed audio transcript', handwritten:'Handwriting OCR', doctor_notes:'Doctor notes', consultation:'Consultation fields' }[sourceName] || sourceName
+    return <div className="ai-field-review">
+      <small>{quote ? `${sourceLabel || 'Source'}: “${quote}”` : 'No source excerpt returned. Verify the value against the transcript or handwriting.'}</small>
+      {status === 'Needs review'
+        ? <div className="ai-field-actions">
+          <button type="button" className="btn btn-sm" onClick={() => updateFieldReview(key, 'Confirmed')}><Check size={14} /> Confirm</button>
+          <button type="button" className="btn btn-sm" onClick={() => rejectExtraction(key)}><X size={14} /> Reject extraction</button>
+        </div>
+        : <small className="muted small">{status === 'Corrected' ? 'Edited by doctor' : status === 'Rejected' ? 'Extraction rejected' : 'Confirmed by doctor'}</small>}
+    </div>
   }
   const save = async status => {
     setBusy(true); setMsg(null)
@@ -53,8 +160,8 @@ export default function ConsultationReview({ data, initialAi }) {
       if (status === 'Completed') nav('/doctor/consultations'); else flash('ok', 'Consultation saved.') }
     catch (e) { flash('err', e.message) } finally { setBusy(false); setDialog(null) }
   }
-  const pending = ai.draft && ai.draft.review !== 'Reviewed'
-  const canSummarize = !locked && (String(ai.transcript || '').trim() || String(ai.handwritten || '').trim() || String(form.notes || '').trim()) && ai.llm !== 'Processing'
+  const pending = Object.values(ai.extraction?.fieldReview || {}).includes('Needs review')
+  const canSummarize = !locked && (hasValue(ai.transcript) || hasValue(ai.handwritten)) && ai.llm !== 'Processing' && !pending
 
   return <>
     <PageHeader title={`Consultation — ${data.patient}`} subtitle={`${data.date} • ${data.time} • ${data.type}`}
@@ -117,50 +224,62 @@ export default function ConsultationReview({ data, initialAi }) {
         )}
 
         <Card title="Consultation workspace">
-          <fieldset disabled={locked} className="fs">
+          <fieldset disabled={locked || ai.llm === 'Processing'} className="fs">
             <F label="Chief complaint"><input value={form.chiefComplaint} onChange={e => set('chiefComplaint', e.target.value)} /></F>
-            <F label="Symptoms"><textarea rows={2} value={form.symptoms} onChange={e => set('symptoms', e.target.value)} /></F>
+            {renderFieldReview('chiefComplaint')}
+            <F label="Symptoms and history"><textarea rows={3} value={form.symptoms} placeholder="Record doctor-stated onset, duration, severity, location, triggers, and relevant positives or negatives."
+              onChange={e => set('symptoms', e.target.value)} /></F>
+            {renderFieldReview('symptoms')}
             <div className="vitals">{[['bp', 'BP (mmHg)'], ['hr', 'Heart rate'], ['temp', 'Temp (°C)'], ['spo2', 'SpO₂ (%)']].map(([k, l]) =>
-              <F key={k} label={l}><input value={form.vitals[k]} onChange={e => setVital(k, e.target.value)} /></F>)}</div>
-            <F label="Physical examination"><textarea rows={2} value={form.exam} onChange={e => set('exam', e.target.value)} /></F>
-            <F label="Diagnosis"><input value={form.diagnosis} onChange={e => set('diagnosis', e.target.value)} /></F>
-            <F label="Clinical notes"><textarea rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} /></F>
+              <F key={k} label={l}><input value={form.vitals[k]} onChange={e => setVital(k, e.target.value)} /></F>)}
+              <F label="Vitals recorded at"><input type="datetime-local" value={form.vitals.recordedAt} onChange={e => setVital('recordedAt', e.target.value)} /></F></div>
+            {renderFieldReview('vitals')}
+            <F label="Physical examination / findings"><textarea rows={3} value={form.exam} placeholder="Record only stated findings, including body site, side, and pertinent negatives when provided."
+              onChange={e => set('exam', e.target.value)} /></F>
+            {renderFieldReview('exam')}
+            <div className="row">
+              <F label="Diagnosis / assessment"><input value={form.diagnosis} onChange={e => set('diagnosis', e.target.value)} /></F>
+              <F label="Diagnosis status"><select value={form.diagnosisStatus} onChange={e => set('diagnosisStatus', e.target.value)}>
+                <option value="">Not stated</option><option value="Provisional">Provisional</option><option value="Confirmed">Confirmed</option>
+              </select></F>
+            </div>
+            {renderFieldReview('diagnosis')}
+            {renderFieldReview('diagnosisStatus')}
+            <F label="Medications"><textarea rows={3} value={form.medications} placeholder="Doctor-stated name, dose and unit, route, frequency, duration, and start / stop / continue instruction. Leave unstated details blank."
+              onChange={e => set('medications', e.target.value)} /></F>
+            {renderFieldReview('medications')}
+            <F label="Investigations"><textarea rows={2} value={form.investigations} placeholder="Exact test and whether it was ordered, recommended, or only discussed."
+              onChange={e => set('investigations', e.target.value)} /></F>
+            {renderFieldReview('investigations')}
             <F label="Treatment plan"><textarea rows={2} value={form.plan} onChange={e => set('plan', e.target.value)} /></F>
-            <F label="Follow-up instructions"><input value={form.followUp} onChange={e => set('followUp', e.target.value)} /></F>
+            {renderFieldReview('plan')}
+            <F label="Follow-up and safety instructions"><textarea rows={2} value={form.followUp} placeholder="Document stated timeframe, appointment, and return / escalation instructions."
+              onChange={e => set('followUp', e.target.value)} /></F>
+            {renderFieldReview('followUp')}
           </fieldset>
         </Card>
 
-        {!locked && <Card title="AI assistant" action={<span className="badge badge-purple"><Sparkles size={12} /> Draft only</span>}>
+        {!locked && <Card title="AI assistant" action={<span className="badge badge-purple"><Sparkles size={12} /> Doctor review required</span>}>
+          {(ai.sttError || ai.ocrError || ai.llmError) && <div className="alert err" role="alert">{[ai.sttError, ai.ocrError, ai.llmError].filter(Boolean).join(' ')}</div>}
           {(ai.inkImage || ai.handwritten) && <div className="ink-review">
             <div><div className="muted small">Handwritten notes</div>{ai.inkImage && <img className="ink-img" src={ai.inkImage} alt="Handwritten notes from the consultation" />}</div>
-            <div>{ai.ocrProvider?.startsWith('mock') && <div className="alert">Demo mode: recognised text is sample text from a mock provider.</div>}
-              <F label="Recognised text (editable)"><textarea rows={6} value={ai.handwritten || ''} onChange={e => patchAi({ handwritten:e.target.value })} /></F></div></div>}
+            <div><F label="Recognised text (editable)"><textarea rows={6} value={ai.handwritten || ''} onChange={e => patchAi({ handwritten:e.target.value })} /></F></div></div>}
           <Recorder onAudio={transcribe} disabled={ai.stt === 'Processing'} />
           <div className="job"><span>Speech-to-text</span><StatusBadge status={ai.stt === 'Idle' ? 'Draft' : ai.stt === 'Processing' ? 'In Progress' : ai.stt} /></div>
           {ai.stt === 'Processing' && <LoadingState label="Transcribing audio…" />}
-          {ai.sttProvider?.startsWith('mock') && <div className="alert">Demo mode: this transcript is sample text from a mock provider, not your audio.</div>}
-          <F label="Transcript (editable)"><textarea rows={6} value={ai.transcript} placeholder="Record or upload audio to generate a transcript, or paste one here."
+          <F label="Transcript (speaker not identified)"><textarea rows={6} value={ai.transcript} placeholder="Paste or edit the full conversation."
             onChange={e => patchAi({ transcript:e.target.value })} /></F>
-          <button className="btn btn-primary" disabled={!canSummarize} onClick={summarize}><Sparkles size={16} /> {ai.llm === 'Processing' ? 'Generating…' : ai.draft ? 'Regenerate summary' : 'Generate summary'}</button>
-
-          {ai.draft && <div className="draft">
-            <AIDraftBanner>{ai.draft.review === 'Reviewed' ? `— reviewed and applied by ${ai.draft.reviewedBy}.` : undefined}</AIDraftBanner>
-            <div className="draft-grid">{DRAFT_FIELDS.map(([k, l]) => <F key={k} label={l}>
-              <textarea rows={2} value={ai.draft.fields[k] || ''} onChange={e => editDraft(k, e.target.value)} disabled={ai.draft.review === 'Reviewed'} /></F>)}</div>
-            {pending && <div className="row"><button className="btn btn-primary" onClick={() => setDialog('apply')}>Review & apply to consultation</button>
-              <button className="btn" onClick={() => patchAi({ draft:null, llm:'Idle' })}>Discard draft</button></div>}
-          </div>}
+          <button className="btn btn-primary" disabled={!canSummarize || pending} onClick={summarize}><Sparkles size={16} />
+            {ai.llm === 'Processing' ? 'Extracting details…' : ai.extraction ? 'Re-extract details' : 'Extract documented details'}</button>
         </Card>}
 
         {!locked && <div className="row end sticky-actions">
           <button className="btn" disabled={busy} onClick={() => save()}>{busy ? 'Saving…' : 'Save draft'}</button>
-          <button className="btn btn-primary" disabled={busy} onClick={() => pending ? flash('err', 'Review the AI draft (apply or discard) before completing this consultation.') : setDialog('complete')}>Complete consultation</button>
+          <button className="btn btn-primary" disabled={busy} onClick={() => pending ? flash('err', 'Confirm, correct, or reject each extracted field before completing this consultation.') : setDialog('complete')}>Complete consultation</button>
         </div>}
       </div>
     </div>
 
-    <ConfirmationDialog open={dialog === 'apply'} title="Apply AI draft?" confirmLabel="Apply draft" onConfirm={applyDraft} onClose={() => setDialog(null)}
-      message="AI output can contain errors. By applying it you confirm you have read and edited it, and you remain responsible for the clinical content." />
     <ConfirmationDialog open={dialog === 'complete'} title="Complete consultation?" confirmLabel="Complete" onConfirm={() => save('Completed')} onClose={() => setDialog(null)}
       message="Completed consultations become read-only." />
 
@@ -191,6 +310,8 @@ export default function ConsultationReview({ data, initialAi }) {
 
         <div><b>Chief Complaint:</b> {form.chiefComplaint || '—'}</div>
         <div><b>Diagnosis:</b> {form.diagnosis || '—'}</div>
+        {form.medications && <div><b>Medications:</b> {form.medications}</div>}
+        {form.investigations && <div><b>Investigations:</b> {form.investigations}</div>}
         <div><b>Clinical Findings / Exam:</b> {form.exam || '—'}</div>
         <div><b>Treatment Plan:</b> {form.plan || '—'}</div>
         {form.followUp && <div><b>Follow-up Recommendation:</b> {form.followUp}</div>}
