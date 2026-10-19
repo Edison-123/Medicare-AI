@@ -1,0 +1,81 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: medicare-backend
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
+  profiles:
+    active: mysql
+
+  datasource:
+    # PRODUCTION NOTE: Enable useSSL=true and provide a trusted certificate store.
+    # PRODUCTION NOTE: Set MYSQL_PASSWORD as a secure environment variable; never hard-code credentials.
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/medicare_db?createDatabaseIfNotExist=true&sslMode=REQUIRED&serverTimezone=UTC}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
+
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      # PRODUCTION NOTE: Change to 'validate' and use Flyway/Liquibase for schema migrations.
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# JWT Configuration
+medicare:
+  jwt:
+    secret: ${MEDICARE_JWT_SECRET}
+    cookie-secure: ${MEDICARE_AUTH_COOKIE_SECURE:true}
+    allow-unsecured: ${MEDICARE_JWT_ALLOW_UNSECURED:false}
+  auth:
+    max-failed-logins: ${MEDICARE_AUTH_MAX_FAILED_LOGINS:5}
+    lockout-duration-minutes: ${MEDICARE_AUTH_LOCKOUT_DURATION_MINUTES:15}
+
+  ai:
+    lifecycle:
+      enabled: ${MEDICARE_AI_AUTOSTART:true}
+      service-root: ${MEDICARE_AI_SERVICE_ROOT:}
+      python: ${MEDICARE_AI_PYTHON:}
+      ollama-command: ${MEDICARE_OLLAMA_COMMAND:ollama}
+      hf-offline: ${MEDICARE_AI_HF_OFFLINE:true}
+      readiness-timeout-seconds: ${MEDICARE_AI_READINESS_TIMEOUT_SECONDS:300}
+    summary:
+      ollama:
+        url: ${MEDICARE_OLLAMA_URL:http://localhost:11434/api/chat}
+        model: ${MEDICARE_OLLAMA_MODEL:qwen2.5:1.5b}
+    transcription:
+      whisper:
+        url: ${MEDICARE_WHISPER_URL:http://localhost:8082/transcribe}
+    ocr:
+      provider: ${MEDICARE_AI_OCR_PROVIDER:microsoft-trocr}
+      trocr:
+        url: ${MEDICARE_TROCR_URL:http://localhost:8081/ocr}
+      azure:
+        endpoint: ${MEDICARE_AI_AZURE_DOCUMENT_ENDPOINT:}
+        key: ${MEDICARE_AI_AZURE_DOCUMENT_KEY:}
+      google:
+        project-id: ${MEDICARE_AI_GOOGLE_PROJECT_ID:}
+        processor-id: ${MEDICARE_AI_GOOGLE_PROCESSOR_ID:}
+      aws:
+        region: ${MEDICARE_AI_AWS_REGION:}
+        access-key: ${MEDICARE_AI_AWS_ACCESS_KEY:}
+        secret-key: ${MEDICARE_AI_AWS_SECRET_KEY:}
+
+# Swagger / OpenAPI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="2140" viewBox="0 0 1500 2140" role="img" aria-labelledby="title description">
+  <title id="title">Fictional consultation handwriting practice sheet</title>
+  <desc id="description">A handwriting-style fictional example covering the consultation form fields and vital signs.</desc>
+  <rect width="1500" height="2140" fill="#fffefa"/>
+  <rect x="54" y="54" width="1392" height="2032" rx="8" fill="none" stroke="#d8e4eb" stroke-width="3"/>
+  <path d="M150 205V1980" stroke="#e5a6a6" stroke-width="3"/>
+  <text x="150" y="115" fill="#172b3a" font-family="Segoe UI, sans-serif" font-size="34" font-weight="700">CONSULTATION PRACTICE NOTE</text>
+  <text x="150" y="160" fill="#657782" font-family="Segoe UI, sans-serif" font-size="22">FICTIONAL EXAMPLE - handwriting practice only, not medical advice</text>
+  <g stroke="#dce8ed" stroke-width="2">
+    <path d="M100 360H1400M100 510H1400M100 660H1400M100 810H1400M100 960H1400M100 1110H1400M100 1260H1400M100 1410H1400M100 1560H1400M100 1710H1400M100 1860H1400M100 2010H1400"/>
+  </g>
+  <g fill="#657782" font-family="Segoe UI, sans-serif" font-size="20" font-weight="600">
+    <text x="185" y="244">CHIEF COMPLAINT</text>
+    <text x="185" y="394">SYMPTOMS AND HISTORY</text>
+    <text x="185" y="544">VITALS</text>
+    <text x="185" y="694">VITALS RECORDED AT</text>
+    <text x="185" y="844">PHYSICAL EXAMINATION / FINDINGS</text>
+    <text x="185" y="994">DIAGNOSIS / ASSESSMENT</text>
+    <text x="185" y="1144">DIAGNOSIS STATUS</text>
+    <text x="185" y="1294">MEDICATIONS</text>
+    <text x="185" y="1444">INVESTIGATIONS</text>
+    <text x="185" y="1594">TREATMENT PLAN</text>
+    <text x="185" y="1744">FOLLOW-UP AND SAFETY INSTRUCTIONS</text>
+  </g>
+  <g fill="#174f91" font-family="Segoe Print, Comic Sans MS, cursive" font-size="35">
+    <text x="190" y="310">Dry cough and sore throat for 3 days</text>
+    <text x="190" y="445">Gradual onset; mild throat pain. No fever, chest pain,</text>
+    <text x="190" y="485">or shortness of breath.</text>
+    <text x="190" y="610">BP 118/76 mmHg; HR 78 bpm; Temp 36.8 C; SpO2 98%</text>
+    <text x="190" y="760">October 16, 2026 at 10:30 AM</text>
+    <text x="190" y="895">Alert and comfortable. Mild throat redness.</text>
+    <text x="190" y="935">Lungs clear on both sides.</text>
+    <text x="190" y="1060">Viral upper respiratory infection</text>
+    <text x="190" y="1210">Provisional</text>
+    <text x="190" y="1360">ExampleMed 10 mg by mouth once daily for 3 days (fictional)</text>
+    <text x="190" y="1510">Rapid antigen test ordered</text>
+    <text x="190" y="1660">Rest, drink fluids, and monitor symptoms.</text>
+    <text x="190" y="1795">Review in 5 days. Seek urgent care if breathing</text>
+    <text x="190" y="1835">becomes difficult or symptoms worsen.</text>
+  </g>
+  <text x="150" y="2050" fill="#657782" font-family="Segoe UI, sans-serif" font-size="18">For practice only. Always verify clinical details and follow your local guidance.</text>
+</svg>

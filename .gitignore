@@ -1,5 +1,39 @@
+# Local configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Java and Maven
+**/target/
+
+# Node and frontend build output
 **/node_modules/
 **/dist/
-**/target/
-**/.env
-!**/.env.example
+**/coverage/
+**/playwright-report/
+**/test-results/
+**/blob-report/
+**/playwright/.cache/
+**/playwright/.auth/
+
+# Python environments, bytecode, and test/lint caches
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Local OCR samples and fine-tuning runs
+medicare-backend/training-data/ocr/.demo-run-*/
+medicare-backend/training-data/ocr/*/
+!medicare-backend/training-data/ocr/README.md
+RxHandBD_TroCR_Ready/
+
+# Editor and operating-system artifacts
+/.agent.md
+.idea/
+.DS_Store
+Thumbs.db
+*.log
